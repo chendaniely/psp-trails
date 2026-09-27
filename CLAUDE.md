@@ -4,13 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Trail network, route generator and website for a trail-running group in
-Pacific Spirit Regional Park (Vancouver, BC). Runs start and finish at the
+Trail network, route generator and website for the Pacific Spirit Trail
+Runners, a trail-running group in Pacific Spirit Regional Park (Vancouver,
+BC); that's also the site's title. Runs start and finish at the
 **Park Centre** (OSM node 317125595, Cleveland Trail at W 16th Ave). The site
-(Quarto, GitHub Pages) shows the trail map, a route of the day (ROTD) with
-elevation profile, written directions, GPX, share link and printable cards,
-a Routes list of every route, the Ultra (every trail in one run), and Bikes
-(the same for bikes, without the hiking-only trails).
+(Quarto, GitHub Pages) has a home page, the trail map, a route of the day
+(ROTD) with elevation profile, written directions, GPX, share link and
+printable cards, a Routes list of every route, the Ultra (every trail in one
+run), and Bikes (the same for bikes, without the hiking-only trails).
 
 Repo: <https://github.com/pstrunners/pstrunners.github.io> (the pstrunners
 organization's Pages repo, so the site is served at the root:
@@ -147,18 +148,24 @@ closest pass if 40–100 m off (labelled as a detour). ~62 km, 3 s to compute. A
 far from the rest can cost the ultra kilometres of detour: check the route and
 remove such stubs in `data/manual/` (as with the SW/NW Marine Dr stub).
 
-**Website** (`website/`, Quarto): `index.qmd` iframes `trail_map.html`.
-The route pages share OJS partials (`{{< include >}}`, `_*.qmd`, not rendered
-on their own): `_common.qmd` (MapLibre, labels, amenities), `_route-helpers.qmd`
-(distance slider, route outline), `_route-picker.qmd` (controls, route of the
-day, map, profile, GPX/share/image; set by a `PICKER` cell) and
-`_ultra-view.qmd` (every-trail stats, map, profile, GPX; set by an `ULTRA`
-cell; its names are prefixed `ultra…` so it can share a page with the
-picker). `rotd.qmd` = picker + cards/directions/cue sheet; `bikes.qmd` =
-picker + ultra view on the bike files; `ultra.qmd` = ultra view + directions;
-`routes.qmd` lists every route (runs or bike rides) and links each to its page
-with `?route=<key>&from=list`. Partials load data with `d3.json(...)`:
-`FileAttachment` only takes a literal file name.
+**Website** (`website/`, Quarto): `index.qmd` is the landing page (team
+photo, intro, Facebook group and Strava club buttons, links into the site);
+`map.qmd` iframes `trail_map.html`.
+- Team photo: goes in `website/images/team-photo.jpg`. Until it exists the
+  home page shows a CSS placeholder (`.hero-placeholder` in `styles.css`);
+  swapping it in is the one-line change described in a comment in
+  `index.qmd`. The photo scales to fit (no cropping), up to 75vh tall.
+- The route pages share OJS partials (`{{< include >}}`, `_*.qmd`, not
+  rendered on their own): `_common.qmd` (MapLibre, labels, amenities),
+  `_route-helpers.qmd` (distance slider, route outline), `_route-picker.qmd`
+  (controls, route of the day, map, profile, GPX/share/image; set by a
+  `PICKER` cell) and `_ultra-view.qmd` (every-trail stats, map, profile, GPX;
+  set by an `ULTRA` cell; its names are prefixed `ultra…` so it can share a
+  page with the picker). `rotd.qmd` = picker + cards/directions/cue sheet;
+  `bikes.qmd` = picker + ultra view on the bike files; `ultra.qmd` = ultra
+  view + directions; `routes.qmd` lists every route (runs or bike rides) and
+  links each to its page with `?route=<key>&from=list`. Partials load data
+  with `d3.json(...)`: `FileAttachment` only takes a literal file name.
 - Route of the day: routes matching the filters are shuffled with
   mulberry32 seeded by FNV-1a of today's date in America/Vancouver
   (Fisher–Yates); order[0] is the route of the day, "Another route" steps

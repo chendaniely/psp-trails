@@ -1,8 +1,55 @@
 ---
-pagetitle: "Pacific Spirit Trails · Map"
-page-layout: custom
+pagetitle: "Pacific Spirit Trail Runners"
+description: "A trail-running group in Pacific Spirit Regional Park, Vancouver, BC."
 ---
 
-<iframe class="trail-map" src="trail_map.html"
-        title="Interactive map of the trails in Pacific Spirit Regional Park"
-        allowfullscreen></iframe>
+::: {.home .column-page}
+
+::: {.home-hero}
+<!-- Team photo: save it as website/images/team-photo.jpg, then replace the
+     placeholder line below with this one line:
+<img class="hero-photo" src="images/team-photo.jpg" alt="The Pacific Spirit Trail Runners">
+-->
+<div class="hero-placeholder"><span>Team photo coming soon</span></div>
+:::
+
+::: {.home-intro}
+# Pacific Spirit Trail Runners
+
+A trail-running group in [Pacific Spirit Regional Park](https://metrovancouver.org/services/regional-parks/park/pacific-spirit-regional-park),
+Vancouver. Our runs start and finish at the Park Centre, the ranger station
+on Cleveland Trail at W 16th Ave.
+
+::: {.home-social}
+[<i class="bi bi-facebook" aria-hidden="true"></i> Facebook group<span class="visually-hidden"> (opens in a new tab)</span>](https://www.facebook.com/groups/116957471699490){.btn .btn-quarto target="_blank" rel="noopener"}
+[<i class="bi bi-strava" aria-hidden="true"></i> Strava club<span class="visually-hidden"> (opens in a new tab)</span>](https://www.strava.com/clubs/pacificspirit){.btn .btn-quarto target="_blank" rel="noopener"}
+:::
+:::
+
+::: {.home-pages role="navigation" aria-label="On this site"}
+::: {.home-page}
+[Route of the day](rotd.qmd){.stretched-link}
+
+A run from the Park Centre, with directions, a GPX file and cards to print.
+:::
+
+::: {.home-page}
+[Routes](routes.qmd){.stretched-link}
+
+Every route by number, to filter and pick from.
+:::
+
+::: {.home-page}
+[Ultra](ultra.qmd){.stretched-link}
+
+One run over every trail in the park.
+:::
+
+::: {.home-page}
+[Bikes](bikes.qmd){.stretched-link}
+
+Rides on the trails open to bikes, and one ride over all of them.
+:::
+:::
+
+:::

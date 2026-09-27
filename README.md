@@ -1,7 +1,8 @@
 # psp-trails
 
 Trail data for [Pacific Spirit Regional Park](https://metrovancouver.org/services/regional-parks/park/pacific-spirit-regional-park)
-(Vancouver, BC) and the streets around it, for a running group that wants to:
+(Vancouver, BC) and the streets around it, for the Pacific Spirit Trail
+Runners, a running group that wants to:
 
 - turn written trail directions into a GPX route, and a GPX route into
   turn-by-turn directions;
@@ -20,7 +21,7 @@ Needs [uv](https://docs.astral.sh/uv/) and `make`.
 uv sync      # install dependencies into .venv
 make         # download data, apply our edits, build the map, run checks
 make view    # open output/trail_map.html
-make preview # the website, with the map as its front page
+make preview # the website (map and routes copied in first)
 ```
 
 Each numbered script can also be run cell-by-cell (`# %%` markers) from the
@@ -49,10 +50,14 @@ hours and seasonal closures before race day.
 
 ## Website
 
-`website/` is a [Quarto](https://quarto.org) site whose front page is the
-map. On every push to `main`, the GitHub Action in
+`website/` is a [Quarto](https://quarto.org) site. `index.qmd` is the
+landing page: the team photo, a short intro, buttons for our Facebook
+group and Strava club, and links into the site. The map is
+`map.qmd`. The team photo goes in `website/images/team-photo.jpg`; until
+it's there the page shows a placeholder, and a comment in `index.qmd` gives
+the one line to swap in. On every push to `main`, the GitHub Action in
 `.github/workflows/publish-website.yml` rebuilds the map from the committed
-OSM snapshot in `data/raw/` (steps 04–07, no downloads), stops if a
+OSM snapshot in `data/raw/` (steps 04–08, runs and bikes, no downloads), stops if a
 connection check fails, and publishes the site to the `gh-pages` branch:
 <https://pstrunners.github.io/>.
 

@@ -1,0 +1,8 @@
+---
+pagetitle: "Map"
+page-layout: custom
+---
+
+<iframe class="trail-map" src="trail_map.html"
+        title="Interactive map of the trails in Pacific Spirit Regional Park"
+        allowfullscreen></iframe>
