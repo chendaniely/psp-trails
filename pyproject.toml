@@ -9,6 +9,7 @@ dependencies = [
     "maplibre>=0.3.6",
     "networkx>=3.7",
     "osmnx>=2.1.1",
+    "rasterio>=1.5.1",
     "requests>=2.34.2",
     "shapely>=2.1.2",
 ]
@@ -26,3 +27,7 @@ package = false
 # Scripts are run cell-by-cell; a bare expression at the end of a cell
 # displays the value, so it isn't "useless".
 ignore = ["B018"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]  # psp.py and routing.py live at the repo root
+testpaths = ["tests"]

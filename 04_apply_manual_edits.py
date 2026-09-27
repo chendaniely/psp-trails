@@ -1,5 +1,5 @@
 # %% [markdown]
-# # 03 · Apply our manual edits
+# # 04 · Apply our manual edits
 #
 # OSM has more than we want to route on. We keep our own edits in
 # `data/manual/` instead of touching the raw download, so a fresh download
@@ -12,7 +12,7 @@
 #   dead-end stubs on a way we otherwise keep).
 # - `add_connectors.geojson`: short links OSM is missing, e.g. where a trail
 #   crosses a big street but the two sides were never joined. Each end must
-#   be within 5 m of an existing node; step 05 snaps them on.
+#   be within 5 m of an existing node; `psp.walk_graph()` snaps them on.
 #
 # Removed ways are kept in the output with a `removed` reason, so the map can
 # still show what was taken out. Connectors are added with kind "connector".

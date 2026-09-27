@@ -32,9 +32,11 @@ repo root in Positron or VS Code; shared settings live in `psp.py`.
 |---|---|---|
 | 01 | `01_download_park_boundary.py`: official and OSM park boundaries | `data/raw/park_boundary_metrovan.geojson`, `data/raw/park_boundary_osm.geojson` |
 | 02 | `02_download_osm.py`: every `highway=*` way in the park + 400 m, plus public toilets and drinking water | `data/raw/study_area.geojson`, `data/raw/osm_highways.json` (raw Overpass response, keeps node ids), `data/raw/osm_highways.gpkg`, `data/raw/osm_amenities.geojson` |
-| 03 | `03_apply_manual_edits.py`: classify ways, apply our edits in `data/manual/` | `data/processed/ways.gpkg` |
-| 04 | `04_map_trails.py`: interactive MapLibre map | `output/trail_map.html` |
-| 05 | `05_check_connections.py`: do trails connect across Chancellor, University and W 16th, and do the links we rely on (e.g. Vine Maple → Blanca → 16th Ave cycleway) exist? | `output/connection_check.csv` |
+| 03 | `03_download_elevation.py`: ground elevation at every OSM node, from NRCan's 2 m lidar DTM | `data/raw/node_elevation.csv` |
+| 04 | `04_apply_manual_edits.py`: classify ways, apply our edits in `data/manual/` | `data/processed/ways.gpkg` |
+| 05 | `05_map_trails.py`: interactive MapLibre map | `output/trail_map.html` |
+| 06 | `06_check_connections.py`: do trails connect across Chancellor, University and W 16th, and do the links we rely on (e.g. Vine Maple → Blanca → 16th Ave cycleway) exist? | `output/connection_check.csv` |
+| 07 | `07_generate_routes.py`: loops and out-and-backs from the Park Centre (see `routing.py`) | `data/processed/routes.geojson` |
 
 On the map, park trails are coloured by bike access (shared / hiking only /
 untagged), the same split the official park map uses. Hover a line for its
@@ -49,7 +51,7 @@ hours and seasonal closures before race day.
 `website/` is a [Quarto](https://quarto.org) site whose front page is the
 map. On every push to `main`, the GitHub Action in
 `.github/workflows/publish-website.yml` rebuilds the map from the committed
-OSM snapshot in `data/raw/` (steps 03–05, no downloads), stops if a
+OSM snapshot in `data/raw/` (steps 04–07, no downloads), stops if a
 connection check fails, and publishes the site to the `gh-pages` branch:
 <https://chendaniely.github.io/psp-trails/>.
 
@@ -65,13 +67,54 @@ someone's home, in `data/private/`, which git ignores.
 ## How we route
 
 Trails come first. Streets and sidewalks are there to link trails up so a
-route doesn't have to double back, and should be used sparingly. The routing
-steps still to come will weight the network that way.
+route doesn't have to double back, and should be used sparingly.
+
+Step 07 (`routing.py`) builds a library of routes from the Park Centre (the
+ranger station on Cleveland Trail at W 16th Ave), where the group starts:
+
+- A metre of street costs 3x a metre of trail (sidewalk 2.5x, paths outside
+  the park 1.5x), so the cheapest way between two points prefers trails.
+- **Loops** go start → A → B → start, each leg avoiding ground already run
+  (13,500 random tries, fixed seeds). **Out-and-backs** go to a trail
+  junction and back.
+- We keep routes that are at least 80% trail, at most 10% street and (loops)
+  at most 15% run twice, then drop near-duplicates: best route first, each
+  next one kept only if it shares at most 75% of its trail segments with
+  every route already kept (Jaccard similarity; `routing.pick_distinct`).
+  That leaves 226 routes, ~100 of them 7–10 km loops. The knobs are at the
+  top of `07_generate_routes.py`.
+
+Each route also gets:
+
+- **Elevation**: a profile and total climb/descent from NRCan's lidar ground
+  model (bare earth, so the forest canopy doesn't count). Heights are
+  smoothed over 50 m and a climb counts once it passes 1 m, so the totals
+  are on the conservative side of what a watch might show.
+- **Written directions** from the geometry at each junction: "At the T, turn
+  left onto Salish", "Keep right onto Council", "Cross W 16th Ave", with
+  toilets and water as landmarks; plus a short form for printed cards
+  (`T← Salish`, `Y↗ Council`).
+
+The website's **Routes** page picks one: loops by default, 7–10 km on a
+two-thumb slider, and the same "route of the day" for everyone. Route ids
+(L01, L02, …; OB01, …) are positions in the library, shortest first, so they
+can change when the library is regenerated. The page shuffles the routes
+matching your choices with a random generator seeded by today's date in
+Vancouver (FNV-1a hash of the date → mulberry32 → Fisher–Yates); the first
+is the route of the day, and **Another route** steps through the rest without
+repeats. **Share** sends the route (text, directions, and the GPX where the
+phone allows) through the phone's share sheet, with a link ending in
+`?route=<key>`: `key` fingerprints the route's exact path (07), so the link
+keeps opening that route. See `website/routes.qmd` and the About page.
+It shows the map, elevation profile, directions, a cue sheet, a GPX download
+and printable cards (2 to 12 per page; 8 is palm size).
+If a route goes somewhere we wouldn't, that's usually a data fix in
+`data/manual/`.
 
 ## Our edits (`data/manual/`)
 
 OSM has more than we run, and misses a few links we use. Rather than editing
-the download, we keep our changes here; step 03 applies them after every
+the download, we keep our changes here; step 04 applies them after every
 download, and `make` never deletes them.
 
 | File | What it does | Currently |
@@ -82,7 +125,7 @@ download, and `make` never deletes them.
 | `add_connectors.geojson` | Short links OSM is missing; each end must be within 5 m of a node | Cleveland Trail across W 16th; Sword Fern to Douglas Fir across W 16th |
 
 Edit these by hand or at [geojson.io](https://geojson.io). If OSM later
-splits or deletes a way we list by id, step 03 prints a warning. A missing
+splits or deletes a way we list by id, step 04 prints a warning. A missing
 *public* trail is better fixed in OpenStreetMap itself, so every app gets it.
 
 ## Data sources
@@ -90,6 +133,7 @@ splits or deletes a way we list by id, step 03 prints a warning. A missing
 | Data | Source | Licence |
 |---|---|---|
 | Trails, footways, streets | [OpenStreetMap](https://www.openstreetmap.org/relation/11683817) via the Overpass API | © OpenStreetMap contributors, [ODbL](https://opendatacommons.org/licenses/odbl/) |
+| Elevation | [NRCan High Resolution DEM](https://open.canada.ca/data/en/dataset/0fe65119-e96e-4a57-8bfe-9d9245fba06b) (2 m bare-earth DTM, from lidar) | Open Government Licence – Canada |
 | Official park boundary | [Metro Vancouver Regional Parks Boundaries](https://open-data-portal-metrovancouver.hub.arcgis.com/datasets/regional-parks-boundaries) (park code `PAC`) | Open Government Licence – Metro Vancouver |
 | Basemap | [OpenFreeMap](https://openfreemap.org/) | © OpenMapTiles, data © OpenStreetMap contributors |
 
@@ -109,7 +153,7 @@ minutes.
   multi-use), 14.7 km hiking only, 5.4 km with no bike tag.
 - After our edits: 50.1 km (37.3 shared, 11.2 hiking only, 1.6 untagged).
 - In OSM, two W 16th Ave crossings weren't joined (routes detoured 200–480 m);
-  our connectors fix both. Step 05 checks 8 crossings and 4 links.
+  our connectors fix both. Step 06 checks 8 crossings and 4 links.
 - 26 toilets (7 run by Metro Vancouver) and 4 drinking fountains in OSM.
 - The official and OSM park boundaries differ by about 187 ha (861 ha vs 841 ha).
 - Most park trails carry Metro Vancouver's trail number in `ref` (1–33). A few
@@ -133,3 +177,5 @@ derived from OpenStreetMap (`data/raw/osm_*`, our edits in `data/manual/`, and
 the map) is © OpenStreetMap contributors under the
 [ODbL](https://opendatacommons.org/licenses/odbl/), and the park boundary is
 © Metro Vancouver under the Open Government Licence – Metro Vancouver.
+Elevations are from NRCan's High Resolution DEM under the Open Government
+Licence – Canada.

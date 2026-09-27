@@ -24,7 +24,7 @@ from shapely import LineString, Point
 
 ROOT = Path(__file__).resolve().parent
 DATA_RAW = ROOT / "data" / "raw"  # downloads, never edited by hand
-DATA_MANUAL = ROOT / "data" / "manual"  # our own edits (see 03)
+DATA_MANUAL = ROOT / "data" / "manual"  # our own edits (see 04)
 DATA_PROCESSED = ROOT / "data" / "processed"
 DATA_CACHE = ROOT / "data" / "cache"  # osmnx's response cache (Nominatim)
 OUTPUT = ROOT / "output"
@@ -49,6 +49,18 @@ BUFFER_M = 400
 # NAD83 / UTM zone 10N: a metric CRS for buffering and lengths in Vancouver.
 CRS_METRIC = "EPSG:26910"
 CRS_WGS84 = "EPSG:4326"
+
+# Elevation ---------------------------------------------------------------------
+
+# NRCan High Resolution DEM mosaic, 2 m, bare earth (DTM: the ground under the
+# trees, not the canopy), as a Cloud Optimized GeoTIFF. The tile covering the
+# park was found with the STAC API at https://datacube.services.geo.ca/stac/api/
+# (collection hrdem-mosaic-2m). Open Government Licence - Canada.
+DTM_URL = (
+    "https://canelevation-dem.s3.ca-central-1.amazonaws.com/"
+    "hrdem-mosaic-2m/2_3-mosaic-2m-dtm.tif"
+)
+
 
 # OpenStreetMap / Overpass ----------------------------------------------------
 
@@ -221,20 +233,30 @@ def classify_ways(ways, park, in_park_share: float = 0.5):
 # Walkable network ---------------------------------------------------------------
 
 
-def walk_graph(raw: dict, ways: gpd.GeoDataFrame, snap_m: float = 5) -> nx.Graph:
+def walk_graph(
+    raw: dict, ways: gpd.GeoDataFrame, elevation=None, snap_m: float = 5
+) -> nx.Graph:
     """The network we route on, as an undirected graph.
 
     `raw` is the Overpass response from step 02 (it has each way's node ids, so
-    ways that share a node are joined). `ways` is step 03's output: removed and
+    ways that share a node are joined). `ways` is step 04's output: removed and
     excluded ways are left out, cut ways lose the part between `cut_from` and
     `cut_to`, and our added connectors are joined to the nearest node within
     `snap_m` metres at each end.
 
-    Nodes carry `x`, `y` (metres, CRS_METRIC); edges carry `length` (m),
-    `osm_id` (None for our connectors) and `name`.
+    `elevation` (optional) maps OSM node id -> metres (step 03). Nodes along a
+    bridge get heights interpolated between its ends: the ground model gives
+    the creek bed underneath, not the bridge deck.
+
+    Nodes carry `x`, `y` (metres, CRS_METRIC) and `z` if `elevation` is
+    given; edges carry `length` (m),
+    `osm_id` (None for our connectors), `name` and `kind` (see classify_ways,
+    plus "connector").
     """
     usable = ways[ways["removed"].isna() & (ways["kind"] != "excluded")]
-    osm_ids = set(usable["osm_id"].dropna().astype(int))
+    osm_ways = usable[usable["osm_id"].notna()]
+    kind_of = dict(zip(osm_ways["osm_id"].astype(int), osm_ways["kind"]))
+    osm_ids = set(kind_of)
     cuts = {
         int(way): (int(a), int(b))
         for way, a, b in usable[["osm_id", "cut_from", "cut_to"]].dropna().values
@@ -263,6 +285,7 @@ def walk_graph(raw: dict, ways: gpd.GeoDataFrame, snap_m: float = 5) -> nx.Graph
                 length=math.hypot(xb - xa, yb - ya),
                 osm_id=el["id"],
                 name=el.get("tags", {}).get("name"),
+                kind=kind_of[el["id"]],
             )
 
     # Our connectors: snap both ends onto the network.
@@ -276,5 +299,22 @@ def walk_graph(raw: dict, ways: gpd.GeoDataFrame, snap_m: float = 5) -> nx.Graph
             if gaps.min() > snap_m:
                 raise ValueError(f"Connector {name!r}: no node within {snap_m} m")
             ends.append(node_ids[gaps.argmin()])
-        G.add_edge(*ends, length=line.length, osm_id=None, name=name)
+        G.add_edge(*ends, length=line.length, osm_id=None, name=name, kind="connector")
+
+    if elevation is not None:
+        for node in G:
+            G.nodes[node]["z"] = float(elevation[node])
+        for el in raw["elements"]:
+            bridge = el.get("tags", {}).get("bridge", "no")
+            if el["type"] != "way" or bridge == "no" or el["id"] not in osm_ids:
+                continue
+            on_graph = [n for n in el["nodes"] if n in G]
+            if len(on_graph) < 3:
+                continue
+            xy = np.array([(G.nodes[n]["x"], G.nodes[n]["y"]) for n in on_graph])
+            along = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(xy, axis=0).T))])
+            ends_z = [G.nodes[on_graph[0]]["z"], G.nodes[on_graph[-1]]["z"]]
+            flat = np.interp(along[1:-1], along[[0, -1]], ends_z)
+            for n, z in zip(on_graph[1:-1], flat):
+                G.nodes[n]["z"] = float(z)
     return G

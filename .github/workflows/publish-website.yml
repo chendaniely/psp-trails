@@ -29,19 +29,27 @@ jobs:
       - name: Install Python dependencies
         run: uv sync --locked
 
-      - name: Apply our edits and build the map (steps 03-04)
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Apply our edits and build the map (steps 04-05)
         run: |
-          uv run python 03_apply_manual_edits.py
-          uv run python 04_map_trails.py
+          uv run python 04_apply_manual_edits.py
+          uv run python 05_map_trails.py
           cp output/trail_map.html website/trail_map.html
 
-      - name: Check trail connections (step 05); stop if any fail
+      - name: Check trail connections (step 06); stop if any fail
         run: |
-          uv run python 05_check_connections.py
+          uv run python 06_check_connections.py
           if grep -E ",(DETOUR|NOT CONNECTED)," output/connection_check.csv; then
             echo "::error::A trail connection is broken; see the table above"
             exit 1
           fi
+
+      - name: Generate routes from the Park Centre (step 07)
+        run: |
+          uv run python 07_generate_routes.py
+          cp data/processed/routes.geojson website/routes.geojson
 
       - uses: quarto-dev/quarto-actions/setup@v2
 

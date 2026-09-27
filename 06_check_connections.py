@@ -1,5 +1,5 @@
 # %% [markdown]
-# # 05 · Check the connections routing depends on
+# # 06 · Check the connections routing depends on
 #
 # Two kinds of check, both on the walkable network (OSM + our edits):
 #
@@ -13,9 +13,9 @@
 #    nearest node; the path between them must be no longer than `max_m`.
 #
 # A failure means OSM changed or is missing a link: add a connector in
-# `data/manual/add_connectors.geojson` (see step 03).
+# `data/manual/add_connectors.geojson` (see step 04).
 #
-# Inputs:  `data/raw/osm_highways.json` (02), `data/processed/ways.gpkg` (03)
+# Inputs:  `data/raw/osm_highways.json` (02), `data/processed/ways.gpkg` (04)
 # Output:  `output/connection_check.csv`
 
 # %%

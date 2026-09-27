@@ -1,7 +1,7 @@
 # %% [markdown]
-# # 04 · Map the trails
+# # 05 · Map the trails
 #
-# Draws the ways from step 03 (sorted into park trail / other path / sidewalk /
+# Draws the ways from step 04 (sorted into park trail / other path / sidewalk /
 # street / excluded, with our manual removals applied) on an interactive
 # MapLibre map. Ways we removed are in their own layer, off by default.
 #
@@ -13,7 +13,7 @@
 # long runs and aid stations; click one for its hours and operator.
 #
 # Inputs:  `data/raw/*` boundaries and amenities (01, 02),
-#          `data/processed/ways.gpkg` (03)
+#          `data/processed/ways.gpkg` (04)
 # Output:  `output/trail_map.html` (self-contained; open it in a browser)
 
 # %%
@@ -234,7 +234,7 @@ m.add_layer(
     )
 )
 
-# Links we added in step 03 where OSM is missing a connection
+# Links we added in step 04 where OSM is missing a connection
 m.add_layer(
     Layer(
         id="Added by our edits",
@@ -248,7 +248,7 @@ m.add_layer(
     )
 )
 
-# What we removed in step 03, drawn on top so it's visible when switched on
+# What we removed in step 04, drawn on top so it's visible when switched on
 m.add_layer(
     Layer(
         id="Removed by our edits",

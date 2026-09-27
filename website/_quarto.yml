@@ -1,9 +1,10 @@
 project:
   type: website
-  # The map is built by the Python pipeline (step 04) and copied in by
-  # `make website` locally, or by the GitHub Action.
+  # The map (step 05) and routes (step 07) are built by the Python pipeline
+  # and copied in by `make website` locally, or by the GitHub Action.
   resources:
     - trail_map.html
+    - routes.geojson
 
 website:
   title: "Pacific Spirit Trails"
@@ -14,6 +15,8 @@ website:
     left:
       - href: index.qmd
         text: Map
+      - href: routes.qmd
+        text: Routes
       - href: about.qmd
         text: About
     right:

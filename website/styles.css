@@ -9,3 +9,150 @@
   padding: 0;
   margin: 0;
 }
+
+/* Routes page */
+.route-map {
+  width: 100%;
+  height: min(65vh, 560px);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(11, 11, 11, 0.1);
+}
+.route-card h3 {
+  margin: 0.5rem 0 0.25rem;
+}
+.route-stats {
+  margin-bottom: 0.75rem;
+}
+.route-id {
+  color: #52514e;
+}
+.cue-sheet td:first-child,
+.cue-sheet td:last-child {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Quarto's theme gives Observable buttons the same text and background colour */
+.observablehq .btn-quarto,
+.observablehq button {
+  color: #fff;
+}
+
+/* Two-thumb distance slider: two range inputs stacked on one track. Only the
+   thumbs take pointer events, so each can be dragged. */
+.range2 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0.25rem 0 0.5rem;
+}
+.range2 > label {
+  width: 120px; /* matches Observable Inputs labels */
+}
+.range2-track {
+  position: relative;
+  flex: 1 1 200px;
+  max-width: 320px;
+  height: 28px;
+}
+.range2-track::before {
+  content: "";
+  position: absolute;
+  inset: 12px 0;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #dee2e6 var(--lo),
+    #2a78d6 var(--lo),
+    #2a78d6 var(--hi),
+    #dee2e6 var(--hi)
+  );
+}
+.range2-track input[type="range"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: none;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.range2-track input[type="range"]::-webkit-slider-runnable-track {
+  background: none;
+}
+.range2-track input[type="range"]::-moz-range-track {
+  background: none;
+}
+.range2-track input[type="range"]::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #2a78d6;
+  cursor: pointer;
+}
+.range2-track input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #2a78d6;
+  cursor: pointer;
+}
+.range2 output {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Directions and printable card */
+.route-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 1rem;
+}
+.route-actions form {
+  margin: 0;
+}
+.directions {
+  padding-left: 1.5rem;
+}
+.directions li {
+  margin: 0.15rem 0;
+}
+.directions .at-km {
+  display: inline-block;
+  min-width: 2.5rem;
+  color: #52514e;
+  font-variant-numeric: tabular-nums;
+}
+.cue-details summary {
+  cursor: pointer;
+  color: #52514e;
+  margin: 0.5rem 0;
+}
+.card-preview {
+  overflow-x: auto;
+}
+.layout-size {
+  margin: -0.25rem 0 0.5rem 132px; /* under the buttons, past the label */
+  color: #52514e;
+  font-size: 0.9rem;
+}
+@media (max-width: 600px) {
+  .layout-size {
+    margin-left: 0;
+  }
+}
+
+.route-note {
+  color: #52514e;
+  font-size: 0.9rem;
+  margin-top: -0.5rem;
+}
