@@ -1,0 +1,32 @@
+{
+"type": "FeatureCollection",
+"name": "amenities",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"xy_coordinate_resolution": 1e-05,
+"features": [
+{ "type": "Feature", "properties": { "kind": "both" }, "geometry": { "type": "Point", "coordinates": [ -123.22257, 49.25921 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.19115, 49.24948 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.25114, 49.25409 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.2471, 49.25325 ] } },
+{ "type": "Feature", "properties": { "kind": "water" }, "geometry": { "type": "Point", "coordinates": [ -123.2353, 49.25432 ] } },
+{ "type": "Feature", "properties": { "kind": "both" }, "geometry": { "type": "Point", "coordinates": [ -123.22254, 49.2775 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.20001, 49.2545 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.20492, 49.24915 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.2282, 49.24964 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.26149, 49.26258 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.25899, 49.26323 ] } },
+{ "type": "Feature", "properties": { "kind": "water" }, "geometry": { "type": "Point", "coordinates": [ -123.22621, 49.27784 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.25947, 49.26923 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.20944, 49.25783 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.25088, 49.25272 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.2544, 49.27152 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.26116, 49.26874 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.25956, 49.26335 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.22034, 49.24764 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.24244, 49.27954 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.20001, 49.25788 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.20348, 49.23714 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.19867, 49.24268 ] } },
+{ "type": "Feature", "properties": { "kind": "toilets" }, "geometry": { "type": "Point", "coordinates": [ -123.22927, 49.27103 ] } }
+]
+}
