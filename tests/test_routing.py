@@ -398,6 +398,51 @@ def test_postman_route_uses_a_street_only_to_connect_trails():
     assert len(street) == 2  # there and back, nothing more
 
 
+def test_postman_route_can_take_a_road_rather_than_run_a_trail_twice():
+    # A trail from the start out to q, and a longer road from q back to p.
+    coords = {"s": (0, 0), "p": (100, 0), "q": (400, 0), "r": (250, 200)}
+    edges = [("s", "p", 100, "Salal", "park trail"), ("p", "q", 300, "Salal", "park trail"),
+             ("p", "r", 200, "Imperial Dr", "street"), ("r", "q", 200, "Imperial Dr", "street")]  # fmt: skip
+    H = routing.contract(make_graph(edges, coords), keep=["s", "q"])
+    required = {
+        routing.edge_id(u, v, k)
+        for u, v, k, d in H.edges(keys=True, data=True)
+        if d["pieces"][0][1] == "park trail"
+    }
+    for u, v, k, d in H.edges(keys=True, data=True):  # a repeat costs more than road
+        d["ultra"] = d["length"] * (
+            2.5 if routing.edge_id(u, v, k) in required else 1.5
+        )
+
+    def road(steps):
+        return sum(H.edges[s]["pieces"][0][1] == "street" for s in steps)
+
+    assert road(routing.postman_route(H, required, "s")) == 0  # out and back on Salal
+    steps = routing.postman_route(H, required, "s", cost="ultra")
+    assert_closed_walk(steps, "s")
+    assert covered(steps) >= required
+    assert road(steps) == 1  # back along the road instead
+
+
+def test_untangle_runs_a_loop_the_other_way_instead_of_a_u_turn():
+    # 0 -> 1 and straight back to 0, although the walk passes 1 again later.
+    steps = [
+        (0, 1, 0),
+        (1, 0, 0),
+        (0, 2, 0),
+        (2, 1, 0),
+        (1, 3, 0),
+        (3, 2, 0),
+        (2, 0, 0),
+    ]
+    fixed = routing._untangle(steps)
+
+    assert_closed_walk(fixed, 0)
+    ids = [routing.edge_id(*s) for s in fixed]
+    assert sorted(ids) == sorted(routing.edge_id(*s) for s in steps)  # same ground
+    assert all(a != b for a, b in itertools.pairwise(ids))  # no U-turns
+
+
 def test_short_dead_end_offshoots_are_found():
     # A loop with a 100 m offshoot (optional) and an 800 m one (not "short").
     coords = {"a": (0, 0), "b": (100, 0), "c": (100, 100), "d": (0, 100),

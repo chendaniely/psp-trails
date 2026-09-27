@@ -68,6 +68,8 @@ only / untagged, from `bicycle=*`).
 **Manual edits** (`data/manual/`, applied by 04; never edit `data/raw/`):
 - `remove_areas.geojson`: whole ways ≥50% inside are removed. Currently the
   water side of NW/SW Marine Drive (Marine Drive is the park's edge for us).
+- `park_trails.csv`: ways to count as park trail although they're just outside
+  the official boundary (e.g. Camosun Trails up to W 16th Ave).
 - `remove_ways.csv`: OSM way ids with a reason.
 - `cut_ways.csv`: remove part of a way between two of its OSM node ids.
 - `add_connectors.geojson`: links OSM lacks (e.g. across W 16th Ave); each end
@@ -93,12 +95,13 @@ and `cost`. A route is a list of steps `(u, v, key)`.
   the distance.
 - Keep: ≥80% trail, ≤10% street, loops ≤15% repeated. Then `pick_distinct`:
   best first, keep a route only if its edge set shares ≤75% (Jaccard) with
-  every kept route. Knobs are constants at the top of 07 (226 routes today,
-  ~100 loops in 7–10 km).
+  every kept route. Knobs are constants at the top of 07 (268 routes today,
+  140 in 7–10 km).
 - Coverage pass (`routing.cover_gaps`): after de-duplication, loops aimed at
   trail stretches no 7–10 km route runs yet are added (start → one end →
   along it → home, direct or via a random junction), so the 7–10 km set
-  covers ~99.6% of park trail. `coverage.json` lists what's left; the About
+  covers all park trail but the foot of Spanish Trail at NW Marine Dr (92 m;
+  Dan: runs don't do out-and-backs, so that's fine). `coverage.json` lists what's left; the About
   page shows it.
 - `id` (L01…, OB01…) is the position in the library, shortest first, and
   changes when the library does. `key` = sha1 of the route's node sequence,
@@ -116,11 +119,18 @@ and `cost`. A route is a list of steps `(u, v, key)`.
 **Ultra** (`08_plan_ultra.py`, `routing.postman_route`): required = junction
 stretches that are ≥50% park trail. Join the pieces with an MST of cheapest
 paths, pair odd junctions with `nx.min_weight_matching` over cheapest-path
-costs (those stretches are run twice), then `nx.eulerian_circuit` from the
-Park Centre. `routing.offshoots` peels dead ends to find short out-and-back
+costs, then an Euler circuit from the Park Centre. The ultra has its own
+costs (`cost="ultra_cost"`): a trail run a second time 2.5/m, road 1.5/m,
+Imperial Dr and W 29th Ave 1/m. Dan: "rather reduce out and backs and do a
+bit more road for the ultra". `routing._euler_circuit` avoids turning back
+the way it came when another way on is free, and `_untangle` reverses a
+loop to remove a U-turn at a junction passed again; U-turns left are forced
+(dead ends). `routing.offshoots` peels dead ends to find short out-and-back
 branches (≤400 m), marked optional; `directions(..., stop_at_turnaround=False,
 optional=...)` keeps going past dead ends and flags them. Aid passes = within
-250 m of the Park Centre. ~62 km, 3 s to compute. A stray bit of "park trail"
+250 m of the Park Centre. Toilets and water within 25 m of each other are one
+site (toilets / water / both); on the way = every pass within 40 m, or the
+closest pass if 40–100 m off (labelled as a detour). ~62 km, 3 s to compute. A stray bit of "park trail"
 far from the rest can cost the ultra kilometres of detour: check the route and
 remove such stubs in `data/manual/` (as with the SW/NW Marine Dr stub).
 
@@ -136,12 +146,21 @@ remove such stubs in `data/manual/` (as with the SW/NW Marine Dr stub).
   sheet) are named in bold at their midpoints and their faint labels hidden.
 - "Image" draws a 1080×1350 PNG on a canvas (map snapshot via
   `map.once("render")` + `getCanvas()`, name, stats, elevation line, trail
-  sequence, credits) and shares or downloads it.
+  sequence, credits). "Card image" rasterises the fitted card preview:
+  each word drawn at its `Range` rect, rules from borders, the outline SVG
+  re-serialised at full size with the page font. Not SVG `foreignObject`:
+  Safari taints the canvas with it. Both go to the share sheet on phones,
+  else download (`saveImage`).
 - `ultra.qmd` reads `ultra.json`; `about.qmd` reads `coverage.json`. The
   Ultra page credits an existing Pacific Spirit Park ultra route: add its
   link/GPX there when Dan provides it.
-- Share uses the Web Share API (GPX file only where `navigator.canShare`
-  allows; Chrome/Android doesn't for .gpx), else copies text to the clipboard.
+- Share uses the Web Share API only on touch devices (`pointer: coarse`),
+  with the GPX file where `navigator.canShare` allows; otherwise, or if the
+  share is refused, it copies the text ("Copy link" on desktop). Desktop
+  Chrome on a Mac has `navigator.share` but rejects it ("Permission denied").
+- Ultra map icons (toilets / water / both) are canvases added with
+  `map.addImage` as `amenity-*`: the OpenFreeMap sprite already has
+  "toilets" and "water".
 - Printable cards: `LAYOUTS` (2–12 per letter page; 8 = palm size). Text
   auto-shrinks until the directions fit (`fitCards`); "Print cards" opens a
   standalone page in a new window and calls `window.print()`.

@@ -229,10 +229,16 @@ def classify_ways(ways, park, in_park_share: float = 0.5):
 
     ways["bike"] = None
     is_trail = ways["kind"] == "park trail"
-    ways.loc[is_trail, "bike"] = "untagged"
-    ways.loc[is_trail & tag("bicycle").isin(BIKE_SHARED), "bike"] = "shared"
-    ways.loc[is_trail & tag("bicycle").isin(BIKE_HIKING_ONLY), "bike"] = "hiking only"
+    ways.loc[is_trail, "bike"] = bike_access(tag("bicycle")[is_trail])
     return ways
+
+
+def bike_access(bicycle: pd.Series) -> pd.Series:
+    """Bikes on a park trail, from its bicycle=* tag: shared, hiking only or untagged."""
+    bike = pd.Series("untagged", index=bicycle.index, dtype=object)
+    bike[bicycle.isin(BIKE_SHARED)] = "shared"
+    bike[bicycle.isin(BIKE_HIKING_ONLY)] = "hiking only"
+    return bike
 
 
 # Walkable network ---------------------------------------------------------------

@@ -25,7 +25,7 @@ covering every trail in the park with as little backtracking as possible.
 - The buttons at the top left turn layers on and off, including what we
   removed from the network (red) and links we added (dotted black).
 
-On a phone, the [full-screen map](trail_map.html) is easier to use.
+On a phone, the [full-screen map](trail_map.html){target="_blank"} is easier to use.
 
 ## Routes
 
@@ -33,7 +33,7 @@ The [Routes](routes.qmd) page picks a loop (or out-and-back) from the Park
 Centre at the distance you choose: the same route of the day for everyone,
 or shuffle for another. Each comes with an elevation profile, written
 directions, a GPX file, an image for sharing, and palm-size cards to print
-for anyone running without a device. The [Ultra](ultra.qmd) page is one
+for anyone running without a device (or to save as a picture on your phone). The [Ultra](ultra.qmd) page is one
 route over every trail in the park.
 
 ### How routes are made and picked
@@ -117,7 +117,9 @@ Nothing is stored or sent anywhere: every phone does the same arithmetic.
 the first in today's order.
 
 **Sharing a route.** **Share** opens your phone's share sheet with the route's
-name, distance, climb, written directions and a link. The link ends in
+name, distance, climb, written directions and a link. On a computer the
+button is **Copy link**: it copies the same text, ready to paste into an
+email or a message. The link ends in
 `?route=` and a short code that fingerprints the route's exact path, so it
 opens that same route (not the route of the day) for whoever you send it to.
 Where the phone allows, the GPX file goes along too. If the routes have been
@@ -134,6 +136,8 @@ a small set of [edits](https://github.com/pstrunners/pstrunners.github.io/tree/m
   spurs and school grounds.
 - Where a trail crosses W 16th Avenue but OSM never joined the two sides
   (Cleveland Trail; Sword Fern to Douglas Fir), we add the missing link.
+- Camosun Trails' last stretch up to W 16th Ave counts as park trail,
+  although it's just outside the official park boundary.
 - Every build checks that trails still connect across Chancellor Blvd,
   University Blvd and W 16th Ave.
 

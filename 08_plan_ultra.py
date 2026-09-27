@@ -24,6 +24,7 @@
 # %%
 import collections
 import json
+import math
 from itertools import pairwise
 
 import geopandas as gpd
@@ -39,7 +40,18 @@ import routing
 OFFSHOOT_M = 400  # dead-end branches up to this long are optional
 AID_RADIUS_M = 250  # passing this close to the Park Centre counts as an aid stop
 AMENITY_RADIUS_M = 40  # toilets / water this close to the route are "on the way"
+DETOUR_M = 100  # ... and this close, worth a short detour (at the closest pass)
+SITE_M = 25  # toilets and water this close together are one stop
 MARKER_KM = 5  # km markers on the map
+
+# What each extra metre costs when joining the trails up. It's an ultra
+# already: a bit of road beats running a trail a second time.
+REPEAT_PER_M = 2.5  # a trail stretch run a second time
+ULTRA_PER_M = {"park trail": 1, "connector": 1, "other path": 1.2, "sidewalk": 1.5, "street": 1.5}  # fmt: skip
+OUR_ROADS = {
+    "Imperial Drive",
+    "West 29th Avenue",
+}  # we run these anyway: as good as trail
 
 # %% The network: OSM + our edits, main connected piece, with elevations
 raw = json.loads((psp.DATA_RAW / "osm_highways.json").read_text())
@@ -64,8 +76,18 @@ required = {
 all_trail_km = sum(trail_m(d) for _, _, d in H.edges(data=True)) / 1000
 print(f"{len(required)} stretches to run; {all_trail_km:.1f} km of park trail")
 
+# %% The cost of each stretch, for the ultra (see REPEAT_PER_M)
+for u, v, k, d in H.edges(keys=True, data=True):
+    if routing.edge_id(u, v, k) in required:
+        d["ultra_cost"] = d["length"] * REPEAT_PER_M
+    else:
+        d["ultra_cost"] = sum(
+            m * (1 if name in OUR_ROADS else ULTRA_PER_M[kind])
+            for name, kind, m in d["pieces"]
+        )
+
 # %% The route
-steps = routing.postman_route(H, required, start)
+steps = routing.postman_route(H, required, start, cost="ultra_cost")
 stats = routing.route_stats(H, steps)
 optional = routing.offshoots(H, OFFSHOOT_M) & {routing.edge_id(*s) for s in steps}
 main_steps = [s for s in steps if routing.edge_id(*s) not in optional]
@@ -92,43 +114,54 @@ def lon_lat_line(line_nodes, tolerance_m=2):
     return [[round(x, 5), round(y, 5)] for x, y in zip(lons, lats)]
 
 
-def passes(near):
-    """km of each separate pass by something: the closest point of each run of True."""
+def passes(gap, within):
+    """Metres along the route of each separate pass within `within` metres of
+    something (`gap`: its distance from each route point), at the closest point."""
+    near = gap <= within
     out, i = [], 0
     while i < len(near):
         if near[i]:
             j = i
             while j < len(near) and near[j]:
                 j += 1
-            out.append(float(along[i]))
+            out.append(float(along[i + np.argmin(gap[i:j])]))
             i = j
         else:
             i += 1
     return out
 
 
-# %% Aid station passes (near the Park Centre), and toilets / water on the way
+# %% Aid station passes (near the Park Centre)
 centre = np.array([G.nodes[start]["x"], G.nodes[start]["y"]])
-aid_km = [round(m / 1000, 1) for m in passes(np.hypot(*(xy - centre).T) < AID_RADIUS_M)]
+aid_km = [round(m / 1000, 1) for m in passes(np.hypot(*(xy - centre).T), AID_RADIUS_M)]
 
+# %% Toilets and water: one site where they're within SITE_M of each other
 amenities = gpd.read_file(psp.DATA_RAW / "osm_amenities.geojson").to_crs(psp.CRS_METRIC)
 KIND = {"toilets": "toilets", "drinking_water": "water"}
-on_the_way = []
+sites = []
 for point, amenity in zip(amenities.geometry, amenities["amenity"]):
-    gap = np.hypot(xy[:, 0] - point.x, xy[:, 1] - point.y)
-    far_from_start = np.hypot(point.x - centre[0], point.y - centre[1]) > AID_RADIUS_M
-    if gap.min() <= AMENITY_RADIUS_M and far_from_start:
-        lon, lat = to_lon_lat.transform(point.x, point.y)
-        for m in passes(gap <= AMENITY_RADIUS_M):
-            on_the_way.append(
-                {
-                    "km": round(m / 1000, 1),
-                    "kind": KIND[amenity],
-                    "lon": lon,
-                    "lat": lat,
-                }
-            )
-on_the_way.sort(key=lambda a: a["km"])
+    site = next((s for s in sites if math.dist(s["xy"], (point.x, point.y)) <= SITE_M), None)  # fmt: skip
+    if site:
+        site["kinds"].add(KIND[amenity])
+    else:
+        sites.append({"xy": (point.x, point.y), "kinds": {KIND[amenity]}})
+
+# The ones on the way: every pass within AMENITY_RADIUS_M, or a detour up to DETOUR_M
+on_the_way = []  # (km, kind), away from the Park Centre
+for site in sites:
+    gap = np.hypot(xy[:, 0] - site["xy"][0], xy[:, 1] - site["xy"][1])
+    site["off_m"] = round(gap.min())
+    if site["off_m"] <= AMENITY_RADIUS_M:
+        site["km"] = [round(m / 1000, 1) for m in passes(gap, AMENITY_RADIUS_M)]
+    elif site["off_m"] <= DETOUR_M:
+        site["km"] = [round(along[np.argmin(gap)] / 1000, 1)]
+    else:
+        site["km"] = []
+    site["aid"] = math.dist(site["xy"], centre) <= AID_RADIUS_M
+    if not site["aid"]:
+        on_the_way += [(km, kind) for km in site["km"] for kind in site["kinds"]]
+on_the_way.sort()
+pd.DataFrame([s for s in sites if s["km"]])
 
 
 def merge(stops, within_km=1.0):
@@ -144,7 +177,7 @@ def merge(stops, within_km=1.0):
 
 
 aid_stops = merge([(km, "aid") for km in aid_km], within_km=3.0)
-water_stops = merge([(a["km"], a["kind"]) for a in on_the_way])
+water_stops = merge(on_the_way)
 aid_stops, pd.DataFrame(water_stops, columns=["from km", "to km", "what"])
 
 # %% Map layers: first time along a stretch, a repeat, or an optional offshoot
@@ -169,8 +202,13 @@ for km in range(MARKER_KM, int(along[-1] / 1000) + 1, MARKER_KM):
     x = np.interp(km * 1000, along, xy[:, 0])
     y = np.interp(km * 1000, along, xy[:, 1])
     points.append({"kind": "km", "label": str(km), "xy": (x, y)})
-for a in on_the_way:
-    points.append({"kind": a["kind"], "label": f"{a['km']} km", "lon_lat": (a["lon"], a["lat"])})  # fmt: skip
+for site in sites:
+    if site["km"]:
+        kind = "both" if len(site["kinds"]) == 2 else next(iter(site["kinds"]))
+        where = "at the Park Centre" if site["aid"] else f"km {', '.join(map(str, site['km']))}"  # fmt: skip
+        if site["off_m"] > AMENITY_RADIUS_M:
+            where += f", {site['off_m']} m off the route"
+        points.append({"kind": kind, "label": where, "xy": site["xy"]})
 
 at, z, px, py = routing.elevation_profile(G, nodes)
 gain, loss = routing.climb(z)
@@ -194,7 +232,7 @@ len(directions)
 
 # %% Save for the Ultra page
 def point_feature(p):
-    lon, lat = p["lon_lat"] if "lon_lat" in p else to_lon_lat.transform(*p["xy"])
+    lon, lat = to_lon_lat.transform(*p["xy"])
     return {
         "type": "Feature",
         "properties": {"kind": p["kind"], "label": p["label"]},
@@ -216,7 +254,7 @@ ultra = {
         "aid": [
             [a, b] for a, b, _ in aid_stops
         ],  # [from km, to km] near the Park Centre
-        "on_the_way": water_stops,  # [from km, to km, ["toilets", "water"]]
+        "on_the_way": water_stops,  # [from km, to km, ["toilets", "water"]], not at the Park Centre
     },
     "segments": {
         "type": "FeatureCollection",

@@ -5,6 +5,8 @@
 # `data/manual/` instead of touching the raw download, so a fresh download
 # never wipes them:
 #
+# - `park_trails.csv`: ways that are park trails although they lie just outside
+#   the official boundary polygon (so step 01's boundary calls them "other path").
 # - `remove_ways.csv`: OSM way ids to drop (click a line on the map to see its
 #   id), with a reason.
 # - `remove_areas.geojson`: polygons; a way at least half inside one is dropped.
@@ -36,6 +38,16 @@ import psp
 park = gpd.read_file(psp.DATA_RAW / "park_boundary_metrovan.geojson")
 ways = psp.classify_ways(gpd.read_file(psp.DATA_RAW / "osm_highways.gpkg"), park)
 ways["removed"] = None  # a reason string once removed
+
+# %% Park trails just outside the official boundary
+park_trails = pd.read_csv(psp.DATA_MANUAL / "park_trails.csv")
+missing = set(park_trails["osm_id"]) - set(ways["osm_id"])
+if missing:
+    print(f"WARNING: not in this download, check on openstreetmap.org: {missing}")
+now_trail = ways["osm_id"].isin(park_trails["osm_id"])
+ways.loc[now_trail, "kind"] = "park trail"
+ways.loc[now_trail, "bike"] = psp.bike_access(ways.loc[now_trail, "bicycle"])
+ways.loc[now_trail, ["osm_id", "name", "length_m", "bike"]]
 
 # %% Remove areas
 remove_areas = gpd.read_file(psp.DATA_MANUAL / "remove_areas.geojson")

@@ -320,10 +320,33 @@ function gpx(f) {
 </gpx>`;
 }
 
+// Phones and tablets get the share sheet. Desktop browsers either have none
+// or refuse (Chrome on a Mac: "Permission denied"), so there we copy or download.
+touch = matchMedia("(pointer: coarse)").matches
+
+async function shareSheet(data) {
+  if (!touch || !navigator.canShare?.(data)) return "unavailable";
+  try {
+    await navigator.share(data);
+    return "shared";
+  } catch (e) {
+    return e.name === "AbortError" ? "cancelled" : "failed";
+  }
+}
+
+// Save an image: to the share sheet (Photos, Strava, ...) or as a download.
+async function saveImage(blob, name, title) {
+  const result = await shareSheet({files: [new File([blob], name, {type: "image/png"})], title});
+  if (result === "shared" || result === "cancelled") return;
+  const a = Object.assign(document.createElement("a"), {href: URL.createObjectURL(blob), download: name});
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 // Share: the phone's share sheet (messages, WhatsApp, email, Strava, ...).
 // The text has a link that opens this exact route; the GPX goes along where
-// the phone allows files. With no share sheet, the text goes to the clipboard.
-function shareRoute(f) {
+// the phone allows files. Otherwise the text goes to the clipboard.
+async function shareRoute(f) {
   const p = f.properties;
   const link = `${location.origin}${location.pathname}?route=${p.key}`;
   const text = [
@@ -335,20 +358,24 @@ function shareRoute(f) {
   ].join("\n");
   const title = `Pacific Spirit run: ${p.name}`;
   const file = new File([gpx(f)], `psp-${p.id}.gpx`, {type: "application/gpx+xml"});
-  const quietly = (e) => { if (e.name !== "AbortError") throw e; }; // user cancelled
-  if (navigator.canShare?.({files: [file]})) {
-    return navigator.share({title, text, files: [file]}).catch(quietly);
-  }
-  if (navigator.share) return navigator.share({title, text}).catch(quietly);
-  return navigator.clipboard.writeText(text).then(() => "copied");
+  let result = await shareSheet({title, text, files: [file]});
+  if (result === "unavailable") result = await shareSheet({title, text});
+  if (result === "shared" || result === "cancelled") return result;
+  await navigator.clipboard.writeText(text);
+  return "copied";
 }
 
 function shareButton(f) {
-  const button = html`<button class="btn btn-quarto" type="button">Share</button>`;
+  const label = touch ? "Share" : "Copy link";
+  const button = html`<button class="btn btn-quarto" type="button"
+    title="The route's link, stats and directions, to paste into a message">${label}</button>`;
   button.onclick = async () => {
-    if ((await shareRoute(f)) === "copied") {
-      button.textContent = "Copied ✓";
-      setTimeout(() => (button.textContent = "Share"), 2000);
+    const note = {copied: "Copied ✓", failed: "Couldn't copy"}[
+      await shareRoute(f).catch(() => "failed")
+    ];
+    if (note) {
+      button.textContent = note;
+      setTimeout(() => (button.textContent = label), 2000);
     }
   };
   return button;
@@ -427,19 +454,8 @@ async function routeImage(f) {
 
 function imageButton(f) {
   const button = html`<button class="btn btn-quarto" type="button">Image</button>`;
-  button.onclick = async () => {
-    const blob = await routeImage(f);
-    const file = new File([blob], `psp-${f.properties.id}.png`, {type: "image/png"});
-    if (navigator.canShare?.({files: [file]})) {
-      await navigator.share({files: [file], title: f.properties.name})
-        .catch((e) => { if (e.name !== "AbortError") throw e; });
-    } else {
-      const a = Object.assign(document.createElement("a"),
-        {href: URL.createObjectURL(blob), download: file.name});
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    }
-  };
+  button.onclick = async () =>
+    saveImage(await routeImage(f), `psp-${f.properties.id}.png`, f.properties.name);
   return button;
 }
 
@@ -487,6 +503,7 @@ html`<p class="layout-size">Each card ${layout.size}</p>`
 route
   ? html`<div class="route-actions">
       ${Inputs.button("Print cards", {reduce: () => printCards(route, layout)})}
+      ${cardImageButton(route)}
     </div>`
   : html``
 ```
@@ -618,6 +635,67 @@ function printCards(f, layout) {
   const w = window.open("", "_blank");
   w.document.write(page);
   w.document.close();
+}
+
+// The card as a picture, to keep on the phone: the preview, each word drawn
+// where the browser put it, at 4x (about 380 dpi). No dashed cut line.
+async function cardImage(card) {
+  const k = 4, box = card.getBoundingClientRect();
+  const canvas = Object.assign(document.createElement("canvas"),
+    {width: Math.round(box.width * k), height: Math.round(box.height * k)});
+  const ctx = canvas.getContext("2d");
+  ctx.scale(k, k);
+  ctx.translate(-box.left, -box.top);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(box.left, box.top, box.width, box.height);
+  for (const el of card.querySelectorAll("*")) { // the rules under the name and over the key
+    const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+    for (const side of ["Top", "Bottom"]) {
+      const w = parseFloat(cs[`border${side}Width`]);
+      if (!w || cs[`border${side}Style`] === "none") continue;
+      ctx.fillStyle = cs[`border${side}Color`];
+      ctx.fillRect(r.left, side === "Top" ? r.top : r.bottom - w, r.width, w);
+    }
+  }
+  for (const svg of card.querySelectorAll("svg")) { // the outline, drawn at full size
+    const r = svg.getBoundingClientRect(), img = new Image(), copy = svg.cloneNode(true);
+    copy.setAttribute("width", r.width * k);
+    copy.setAttribute("height", r.height * k);
+    copy.style.fontFamily = getComputedStyle(svg).fontFamily; // an image doesn't inherit it
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(copy))}`;
+    });
+    ctx.drawImage(img, r.left, r.top, r.width, r.height);
+  }
+  const words = document.createTreeWalker(card, NodeFilter.SHOW_TEXT), range = document.createRange();
+  ctx.textBaseline = "middle";
+  for (let node; (node = words.nextNode()); ) {
+    if (node.parentElement.closest("svg")) continue;
+    const cs = getComputedStyle(node.parentElement);
+    ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    ctx.fillStyle = cs.color;
+    for (const m of node.data.matchAll(/\S+/g)) {
+      range.setStart(node, m.index);
+      range.setEnd(node, m.index + m[0].length);
+      const r = range.getBoundingClientRect();
+      if (r.width && r.bottom <= box.bottom && r.right <= box.right) {
+        ctx.fillText(m[0], r.left, (r.top + r.bottom) / 2);
+      }
+    }
+  }
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+}
+
+function cardImageButton(f) {
+  const button = html`<button class="btn btn-quarto" type="button"
+    title="The card as a picture, to keep on your phone">Card image</button>`;
+  button.onclick = async () => {
+    const card = cardPreview.querySelector(".pc");
+    saveImage(await cardImage(card), `psp-${f.properties.id}-card.png`, f.properties.name);
+  };
+  return button;
 }
 
 cardPreview = {

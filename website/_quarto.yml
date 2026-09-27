@@ -27,6 +27,7 @@ website:
     right:
       - href: trail_map.html
         text: Full-screen map
+        target: _blank
       - icon: github
         href: https://github.com/pstrunners/pstrunners.github.io
         aria-label: Source code on GitHub

@@ -597,14 +597,6 @@ def directions(
 # Covering every trail ------------------------------------------------------------
 
 
-def _cheapest(H, u, v):
-    return min(H[u][v], key=lambda k: H[u][v][k]["cost"])
-
-
-def _cost(u, v, parallel):
-    return min(d["cost"] for d in parallel.values())
-
-
 def offshoots(H, max_m=400):
     """Edge ids on short dead-end branches: offshoots you can only run out and back.
 
@@ -640,7 +632,7 @@ def offshoots(H, max_m=400):
     return short
 
 
-def postman_route(H, required, start):
+def postman_route(H, required, start, cost="cost"):
     """A short closed walk from `start` that runs every edge in `required`.
 
     The route inspection ("Chinese postman") recipe, for when only some edges
@@ -653,7 +645,9 @@ def postman_route(H, required, start):
        stretches run twice;
     3. walk the result as one Euler circuit from the start.
 
-    Costs are the same as for loops, so the extra stretches prefer trails.
+    `cost` names the edge attribute the extra paths minimise. The default is
+    the same as for loops, so the extra stretches prefer trails; pass another
+    to trade differently (say, a bit of road over running a trail twice).
     Returns steps (u, v, key) in H.
     """
     A = nx.MultiGraph()
@@ -661,25 +655,28 @@ def postman_route(H, required, start):
     for a, b, k in required:
         A.add_edge(a, b, h=k)
 
+    def weight(u, v, parallel):
+        return min(d[cost] for d in parallel.values())
+
     def add_path(nodes):
         for u, v in pairwise(nodes):
-            A.add_edge(u, v, h=_cheapest(H, u, v))
+            A.add_edge(u, v, h=min(H[u][v], key=lambda k: H[u][v][k][cost]))
 
     pieces = [set(c) for c in nx.connected_components(A)]
     if len(pieces) > 1:
         between = nx.Graph()
         for i, piece in enumerate(pieces):
-            dist, paths = nx.multi_source_dijkstra(H, piece, weight=_cost)
+            dist, paths = nx.multi_source_dijkstra(H, piece, weight=weight)
             for j in range(i + 1, len(pieces)):
-                cost, end = min((dist[n], n) for n in pieces[j] if n in dist)
-                between.add_edge(i, j, weight=cost, path=paths[end])
+                gap, end = min((dist[n], n) for n in pieces[j] if n in dist)
+                between.add_edge(i, j, weight=gap, path=paths[end])
         for _, _, d in nx.minimum_spanning_edges(between, data=True):
             add_path(d["path"])
 
     odd = [n for n in A if A.degree(n) % 2]
     pairs, paths = nx.Graph(), {}
     for n in odd:
-        dist, found = nx.single_source_dijkstra(H, n, weight=_cost)
+        dist, found = nx.single_source_dijkstra(H, n, weight=weight)
         for m in odd:
             if m != n and not pairs.has_edge(n, m):
                 pairs.add_edge(n, m, weight=dist[m])
@@ -687,10 +684,75 @@ def postman_route(H, required, start):
     for n, m in nx.min_weight_matching(pairs):
         add_path(paths[n, m] if (n, m) in paths else paths[m, n][::-1])
 
-    return [
-        (u, v, A.edges[u, v, key]["h"])
-        for u, v, key in nx.eulerian_circuit(A, source=start, keys=True)
-    ]
+    return _untangle(_euler_circuit(A, start))
+
+
+def _euler_circuit(A, start):
+    """Steps (u, v, key in H) of an Euler circuit of `A` from `start`.
+
+    Hierholzer's algorithm, but at each junction it only turns straight back
+    along the stretch it came in on when there's no other way on: a stretch
+    that must be run twice is then usually run at two different times, not
+    as an out-and-back.
+    """
+    ends = [(u, v, d["h"]) for u, v, d in A.edges(data=True)]
+    at = {n: [] for n in A}
+    for i, (u, v, _) in enumerate(ends):
+        at[u].append(i)
+        if v != u:
+            at[v].append(i)
+    used = [False] * len(ends)
+    stack, circuit = [(start, None)], []  # (junction, the step that got us there)
+    while stack:
+        here, came = stack[-1]
+        free = [i for i in at[here] if not used[i]]
+        if not free:
+            stack.pop()
+            if came:
+                circuit.append(came)
+            continue
+        back = came and edge_id(*came)
+        i = next((i for i in free if edge_id(*ends[i]) != back), free[0])
+        used[i] = True
+        u, v, key = ends[i]
+        there = v if u == here else u
+        stack.append((there, (here, there, key)))
+    return circuit[::-1]
+
+
+def _untangle(steps):
+    """Remove U-turns from a closed walk where the junction is passed again.
+
+    If the walk turns back at junction j and also passes j at another time,
+    the stretch between the two passes is a loop from j to j: run it the other
+    way round and the walk covers the same ground with that U-turn gone (as
+    long as the new turns at either end aren't U-turns themselves).
+    """
+    steps = list(steps)
+
+    def u_turn(a, b):
+        return edge_id(*a) == edge_id(*b)
+
+    def reversed_loop(i, j):
+        return [(v, u, k) for u, v, k in reversed(steps[i:j])]
+
+    changed = True
+    while changed:
+        changed = False
+        for i in range(1, len(steps)):
+            if not u_turn(steps[i - 1], steps[i]):
+                continue
+            here = steps[i][0]
+            for j in range(1, len(steps)):  # other passes by the same junction
+                if j == i or steps[j][0] != here:
+                    continue
+                a, b = sorted((i, j))
+                loop = reversed_loop(a, b)
+                if not u_turn(steps[a - 1], loop[0]) and not u_turn(loop[-1], steps[b]):
+                    steps[a:b] = loop
+                    changed = True
+                    break
+    return steps
 
 
 def cover_gaps(H, start, routes, min_m, max_m, good, tries=40, seed=3):

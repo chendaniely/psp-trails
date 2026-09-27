@@ -83,9 +83,9 @@ ranger station on Cleveland Trail at W 16th Ave), where the group starts:
   next one kept only if it shares at most 75% of its trail segments with
   every route already kept (Jaccard similarity; `routing.pick_distinct`).
 - A **coverage pass** (`routing.cover_gaps`) then adds loops aimed at any
-  trail no 7–10 km route runs yet: 141 routes of 7–10 km cover 49.7 of the
-  park's 49.9 km of trail (the rest is 3 short bits, listed on the About
-  page). 259 routes in all. The knobs are at the top of
+  trail no 7–10 km route runs yet: 140 routes of 7–10 km cover 49.9 of the
+  park's 50.0 km of trail (the rest is the foot of Spanish Trail at NW Marine
+  Dr, listed on the About page). 268 routes in all. The knobs are at the top of
   `07_generate_routes.py`.
 
 Each route also gets:
@@ -109,7 +109,10 @@ is the route of the day, and **Another route** steps through the rest without
 repeats. **Share** sends the route (text, directions, and the GPX where the
 phone allows) through the phone's share sheet, with a link ending in
 `?route=<key>`: `key` fingerprints the route's exact path (07), so the link
-keeps opening that route. See `website/routes.qmd` and the About page.
+keeps opening that route. On a computer the button is **Copy link** and
+copies the same text. **Image** (for social media) and **Card image** (the
+printable card, to keep on a phone) go to the share sheet on phones and
+download elsewhere. See `website/routes.qmd` and the About page.
 It shows the map, elevation profile, directions, a cue sheet, a GPX download
 and printable cards (2 to 12 per page; 8 is palm size).
 If a route goes somewhere we wouldn't, that's usually a data fix in
@@ -123,8 +126,11 @@ toilets and water). It's the route inspection ("Chinese postman") problem:
 join the trail network into one piece, pick the cheapest stretches to run
 twice so every junction is even (minimum-weight matching), then walk it as
 one Euler circuit (`routing.postman_route`). Dead-end offshoots up to 400 m
-are optional (`routing.offshoots`). Today: 62.5 km, ↑680 m, 9.8 km run
-twice. The idea comes from an existing Pacific Spirit Park ultra route,
+are optional (`routing.offshoots`). A bit of road beats running a trail twice
+here (`REPEAT_PER_M`, `ULTRA_PER_M`; Imperial Dr and W 29th Ave count as
+trail), and the circuit only turns straight back at dead ends. Today:
+61.9 km, ↑700 m, 6.4 km run twice, 8% street. The map marks toilets, water, or both (within 25 m of each other) on
+the way: within 40 m of the route, or up to 100 m as a short detour. The idea comes from an existing Pacific Spirit Park ultra route,
 credited on the Ultra page (link to come).
 
 ## Our edits (`data/manual/`)
@@ -135,8 +141,9 @@ download, and `make` never deletes them.
 
 | File | What it does | Currently |
 |---|---|---|
+| `park_trails.csv` | Count a way as park trail although it lies just outside the official boundary | Camosun Trails' last stretch up to W 16th Ave |
 | `remove_areas.geojson` | Drop every way at least half inside a polygon | Water side of NW/SW Marine Drive: Foreshore Trail, Wreck Beach Trails 3/4/6/7, Acadia, Grand Fir, Spanish Banks, Old Marine Drive, the Asian Garden |
-| `remove_ways.csv` | Drop single OSM ways by id (click a line on the map to get it) | Salish past Admiralty to NW Marine Dr; small untagged bits by NW Marine Dr and Salish; the path in University Hill Elementary; dead ends by Pioneer/East Canyon; the parking-lot spurs at Cleveland north of 16th; paths along W 4th Ave and at Drummond Dr |
+| `remove_ways.csv` | Drop single OSM ways by id (click a line on the map to get it) | Salish past Admiralty to NW Marine Dr; small untagged bits by NW Marine Dr and Salish; the path in University Hill Elementary; dead ends by Pioneer/East Canyon; the parking-lot spurs at Cleveland north of 16th; paths along W 4th Ave and at Drummond Dr; the footway off Drummond Dr near Chancellor |
 | `cut_ways.csv` | Drop just part of a way, between two of its OSM nodes | Salish stub past the Admiralty junction; the east end of the shared path along Chancellor, past Spanish Trail |
 | `add_connectors.geojson` | Short links OSM is missing; each end must be within 5 m of a node | Cleveland Trail across W 16th; Sword Fern to Douglas Fir across W 16th |
 

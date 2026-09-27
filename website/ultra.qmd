@@ -25,6 +25,11 @@ function kmRange([a, b]) {
   return from === to ? `km ${from}` : `km ${from}–${to}`;
 }
 
+function onTheWay(kind) {
+  return stats.on_the_way.filter(([, , kinds]) => kinds.includes(kind)).map(kmRange);
+}
+water = onTheWay("water")
+
 html`<div class="route-card">
   <p class="route-stats">
     <strong>${stats.km} km</strong> ·
@@ -35,7 +40,8 @@ html`<div class="route-card">
   <p class="route-stats">
     <strong>Aid station</strong> (Park Centre): start,
     ${stats.aid.slice(1, -1).map(kmRange).join(", ")}, finish ·
-    <strong>Toilets on the way</strong>: ${stats.on_the_way.map(kmRange).join(", ")}
+    <strong>Toilets on the way</strong>: ${onTheWay("toilets").join(", ")} ·
+    <strong>Water</strong>: the aid station${water.length ? `, and near ${water.join(", ")}` : " only"}
   </p>
   <p class="route-id">Short dead-end offshoots are optional: without them it's
     ${stats.km_without_offshoots} km (they add ${stats.offshoot_km} km, out and back).</p>
@@ -54,8 +60,46 @@ html`<div class="ultra-legend">
   <span><i style="background:#eb6834"></i>run a second time</span>
   <span><i class="dashed"></i>optional offshoot</span>
   <span><b class="km">5</b>km marker</span>
-  <span><b class="wc">WC</b>toilets</span>
+  ${Object.entries(AMENITY).map(([kind, text]) =>
+    html`<span><img src=${ICONS[kind].toDataURL()} alt="">${text.toLowerCase()}</span>`)}
 </div>`
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+// Toilets, water, or both: drawn once, for the map and the legend.
+AMENITY = ({toilets: "Toilets", water: "Water", both: "Toilets and water"})
+
+ICONS = {
+  // The same marks as the trail map: a yellow "WC" dot, a magenta "W" dot.
+  const R = 2, D = 22; // pixel ratio; one dot, in CSS px
+  function dot(ctx, cx, color, letters) {
+    ctx.beginPath();
+    ctx.arc(cx, D / 2, D / 2 - 1.5, 0, 2 * Math.PI);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#fcfcfb";
+    ctx.stroke();
+    ctx.fillStyle = "#0b0b0b";
+    ctx.font = "700 9px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(letters, cx, D / 2 + 0.5);
+  }
+  function icon(...dots) { // dots side by side
+    const width = D + (dots.length - 1) * 16;
+    const canvas = Object.assign(document.createElement("canvas"), {width: width * R, height: D * R});
+    canvas.style.width = `${width}px`;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(R, R);
+    dots.forEach(([color, letters], i) => dot(ctx, D / 2 + i * 16, color, letters));
+    return canvas;
+  }
+  const toilets = ["#eda100", "WC"], water = ["#e87ba4", "W"];
+  return {toilets: icon(toilets), water: icon(water), both: icon(toilets, water)};
+}
 ```
 
 ```{ojs}
@@ -116,15 +160,28 @@ map = {
               layout: {"text-field": ["get", "label"], "text-font": ["Noto Sans Bold"],
                        "text-size": 11, "text-allow-overlap": true},
               paint: {"text-color": "#0b0b0b"}});
-  m.addLayer({id: "wc", type: "circle", source: "points", filter: ["==", ["get", "kind"], "toilets"],
-              paint: {"circle-radius": 7, "circle-color": "#eda100",
-                      "circle-stroke-color": "#fcfcfb", "circle-stroke-width": 2}});
+  for (const [kind, canvas] of Object.entries(ICONS)) { // the style has its own "toilets"
+    const {width, height} = canvas;
+    m.addImage(`amenity-${kind}`, canvas.getContext("2d").getImageData(0, 0, width, height), {pixelRatio: 2});
+  }
+  m.addLayer({id: "amenities", type: "symbol", source: "points",
+              filter: ["in", ["get", "kind"], ["literal", Object.keys(AMENITY)]],
+              layout: {"icon-image": ["concat", "amenity-", ["get", "kind"]], "icon-allow-overlap": true}});
+  m.on("click", "amenities", (e) => {
+    const f = e.features[0];
+    new maplibregl.Popup()
+      .setLngLat(f.geometry.coordinates)
+      .setText(`${AMENITY[f.properties.kind]}: ${f.properties.label}`)
+      .addTo(m);
+  });
+  m.on("mouseenter", "amenities", () => (m.getCanvas().style.cursor = "pointer"));
+  m.on("mouseleave", "amenities", () => (m.getCanvas().style.cursor = ""));
   m.addLayer({id: "hover", type: "circle", source: "hover",
               paint: {"circle-radius": 7, "circle-color": "#eb6834",
                       "circle-stroke-color": "#fcfcfb", "circle-stroke-width": 2}});
   new maplibregl.Marker({color: "#0b0b0b"})
     .setLngLat(START)
-    .setPopup(new maplibregl.Popup().setText("Start, finish and aid station: Park Centre"))
+    .setPopup(new maplibregl.Popup().setText("Start, finish and aid station: Park Centre (toilets and water)"))
     .addTo(m);
   const bounds = new maplibregl.LngLatBounds();
   ultra.full.forEach((c) => bounds.extend(c));
@@ -227,9 +284,12 @@ from the trail data by code.
 Finding the shortest run that covers every trail is a classic puzzle, the
 *route inspection* or "Chinese postman" problem. Every junction needs as
 many ways in as ways out; where a junction doesn't have that (a dead end, or
-three trails meeting), some stretch has to be run twice. The script
-(`08_plan_ultra.py`) joins the trail network into one piece, picks the
-cheapest set of stretches to run twice (preferring trails over streets), and
-then walks it all as one loop from the Park Centre. Dead-end offshoots of up
-to 400 m are marked optional. It uses the same trail data and edits as the
+three trails meeting), some stretch has to be run twice, or linked up by
+road. It's an ultra already, so a bit of road beats running a trail a second
+time: the script (`08_plan_ultra.py`) counts a repeat as 2½ times the
+distance and road as 1½ times (Imperial Drive and W 29th Ave, which we run
+anyway, count the same as trail), picks the cheapest way to join everything
+up, and walks it all as one loop from the Park Centre. It only turns
+straight back at a dead end; dead-end offshoots of up to 400 m are marked
+optional. It uses the same trail data and edits as the
 Routes page; see [About](about.qmd).
