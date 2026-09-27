@@ -31,6 +31,8 @@ website/_site/
 website/trail_map.html
 website/routes.geojson
 website/labels.geojson
+website/coverage.json
+website/ultra.json
 
 # Personal data, never committed (e.g. GPX of runs that start from someone's home)
 data/private/

@@ -32,8 +32,9 @@ On a phone, the [full-screen map](trail_map.html) is easier to use.
 The [Routes](routes.qmd) page picks a loop (or out-and-back) from the Park
 Centre at the distance you choose: the same route of the day for everyone,
 or shuffle for another. Each comes with an elevation profile, written
-directions, a GPX file, and palm-size cards to print for anyone running
-without a device.
+directions, a GPX file, an image for sharing, and palm-size cards to print
+for anyone running without a device. The [Ultra](ultra.qmd) page is one
+route over every trail in the park.
 
 ### How routes are made and picked
 
@@ -56,13 +57,46 @@ by all the segments either one uses. The best routes go first (most trail,
 least doubling back, fewest streets), and each next route is kept only if it
 shares at most **75%** with every route already kept. So any two routes
 differ in at least a quarter of their trail, about 2 km on an 8 km loop.
-That leaves 226 routes, including about 100 loops of 7–10 km. Allowing more
-overlap would give more routes, but more of them would feel the same.
+Allowing more overlap would give more routes, but more of them would feel
+the same.
 
 **Route numbers are positions in that list.** Loops are sorted shortest
 first and numbered L01, L02, … (L01 is the shortest loop); out-and-backs are
 OB01, OB02, …. When the data or our edits change and the site is rebuilt,
 the list can change, so a number isn't a permanent name for a route.
+
+**The 7–10 km routes cover the park.** Random turn points tend to miss
+trails close to the start and at the far north end, so after the library is
+built the script adds loops aimed at whatever trail no 7–10 km route runs
+yet, until no more good loops can be found:
+
+```{ojs}
+//| echo: false
+coverage = FileAttachment("coverage.json").json()
+md`Run as a set, the **${coverage.band_routes} routes of ${coverage.band_km[0]}–${coverage.band_km[1]} km**
+(${coverage.added_for_coverage} of them added for coverage) run
+**${coverage.band_trail_km} of the park's ${coverage.park_trail_km} km of trail**
+(${(100 * coverage.band_trail_km / coverage.park_trail_km).toFixed(1)}%).`
+```
+
+Just for fun, here's what they miss. Each bit is too short, or too awkward
+to reach, for a good loop, but it's only a few metres if you want to say
+you've run the lot. "Map" opens the trail map right there.
+
+```{ojs}
+//| echo: false
+html`<table class="table table-sm">
+  <thead><tr><th>Trail</th><th>Length</th><th></th><th></th></tr></thead>
+  <tbody>${coverage.uncovered.map((u) => html`<tr>
+    <td>${u.trail}</td>
+    <td>${u.m} m</td>
+    <td>${u.dead_end ? "dead end" : ""}</td>
+    <td><a href="trail_map.html#18/${u.lat}/${u.lon}" target="_blank">Map</a></td>
+  </tr>`)}</tbody>
+</table>`
+```
+
+The [Ultra](ultra.qmd) page covers everything, these bits included.
 
 **The route of the day is a shuffle seeded by the date.** The page keeps the
 routes that match your choices (type and distance), then shuffles them using

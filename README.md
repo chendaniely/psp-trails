@@ -36,7 +36,8 @@ repo root in Positron or VS Code; shared settings live in `psp.py`.
 | 04 | `04_apply_manual_edits.py`: classify ways, apply our edits in `data/manual/` | `data/processed/ways.gpkg` |
 | 05 | `05_map_trails.py`: interactive MapLibre map | `output/trail_map.html` |
 | 06 | `06_check_connections.py`: do trails connect across Chancellor, University and W 16th, and do the links we rely on (e.g. Vine Maple → Blanca → 16th Ave cycleway) exist? | `output/connection_check.csv` |
-| 07 | `07_generate_routes.py`: loops and out-and-backs from the Park Centre (see `routing.py`) | `data/processed/routes.geojson` |
+| 07 | `07_generate_routes.py`: loops and out-and-backs from the Park Centre (see `routing.py`) | `data/processed/routes.geojson`, `data/processed/coverage.json` |
+| 08 | `08_plan_ultra.py`: one route over every park trail from the Park Centre (route inspection / "Chinese postman") | `data/processed/ultra.json` |
 
 On the map, park trails are coloured by bike access (shared / hiking only /
 untagged), the same split the official park map uses. Hover a line for its
@@ -81,8 +82,11 @@ ranger station on Cleveland Trail at W 16th Ave), where the group starts:
   at most 15% run twice, then drop near-duplicates: best route first, each
   next one kept only if it shares at most 75% of its trail segments with
   every route already kept (Jaccard similarity; `routing.pick_distinct`).
-  That leaves 226 routes, ~100 of them 7–10 km loops. The knobs are at the
-  top of `07_generate_routes.py`.
+- A **coverage pass** (`routing.cover_gaps`) then adds loops aimed at any
+  trail no 7–10 km route runs yet: 142 routes of 7–10 km cover 49.8 of the
+  park's 50.0 km of trail (the rest is 4 unnamed bits, listed on the About
+  page). 263 routes in all. The knobs are at the top of
+  `07_generate_routes.py`.
 
 Each route also gets:
 
@@ -110,6 +114,18 @@ It shows the map, elevation profile, directions, a cue sheet, a GPX download
 and printable cards (2 to 12 per page; 8 is palm size).
 If a route goes somewhere we wouldn't, that's usually a data fix in
 `data/manual/`.
+
+## Ultra: every trail in one run
+
+`08_plan_ultra.py` finds one route over every park trail, starting and
+finishing at the Park Centre (the aid station: free parking along W 16th Ave,
+toilets and water). It's the route inspection ("Chinese postman") problem:
+join the trail network into one piece, pick the cheapest stretches to run
+twice so every junction is even (minimum-weight matching), then walk it as
+one Euler circuit (`routing.postman_route`). Dead-end offshoots up to 400 m
+are optional (`routing.offshoots`). Today: 67.8 km, ↑710 m, 12.4 km run
+twice. The idea comes from an existing Pacific Spirit Park ultra route,
+credited on the Ultra page (link to come).
 
 ## Our edits (`data/manual/`)
 

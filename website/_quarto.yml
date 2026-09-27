@@ -6,6 +6,8 @@ project:
     - trail_map.html
     - routes.geojson
     - labels.geojson
+    - ultra.json
+    - coverage.json
 
 website:
   title: "Pacific Spirit Trails"
@@ -18,6 +20,8 @@ website:
         text: Map
       - href: routes.qmd
         text: Routes
+      - href: ultra.qmd
+        text: Ultra
       - href: about.qmd
         text: About
     right:

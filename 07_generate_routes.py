@@ -11,7 +11,8 @@
 #
 # Trails are preferred: a metre of street costs 3x a metre of trail (see
 # `routing.COST_PER_M`), so streets only appear where they link trails up.
-# We keep routes that are mostly trail and drop near-duplicates.
+# We keep routes that are mostly trail and drop near-duplicates, then add
+# loops until the 7-10 km routes, run as a set, cover every trail they can.
 #
 # Each route also gets its elevation profile and total climb (from step 03),
 # a cue sheet, and written turn-by-turn directions for people who'd rather
@@ -21,6 +22,8 @@
 #          `data/raw/osm_amenities.geojson` (02), `data/processed/ways.gpkg` (04)
 # Output:  `data/processed/routes.geojson`: one feature per route, with its
 #          distance, climb, trail/street share, profile, cue sheet, directions
+#          `data/processed/coverage.json`: how much trail the 7-10 km routes
+#          cover, and the bits they miss (for the About page)
 
 # %%
 import hashlib
@@ -28,7 +31,6 @@ import json
 
 import geopandas as gpd
 import networkx as nx
-import numpy as np
 import pandas as pd
 import pyproj
 from shapely import LineString
@@ -36,9 +38,6 @@ from shapely import LineString
 import psp
 import routing
 
-# OSM "Park Centre" information point (node 317125595), by the toilets and
-# drinking water at Cleveland Trail and W 16th Ave.
-START_LAT_LON = (49.25918, -123.22248)
 MIN_KM, MAX_KM = 4, 12  # the whole library (the website slider's range)
 FOCUS_KM = (7, 10)  # what we usually run: the website's default, so try harder
 LOOP_TRIES = 1500  # over MIN_KM-MAX_KM
@@ -56,14 +55,10 @@ elevation = pd.read_csv(psp.DATA_RAW / "node_elevation.csv", index_col="node")
 G = psp.walk_graph(raw, ways, elevation["elevation_m"])
 G = G.subgraph(max(nx.connected_components(G), key=len)).copy()
 
-# %% Snap the start to the nearest node
-to_metric = pyproj.Transformer.from_crs(psp.CRS_WGS84, psp.CRS_METRIC, always_xy=True)
-start_xy = to_metric.transform(START_LAT_LON[1], START_LAT_LON[0])
-node_ids = list(G.nodes)
-gaps = np.hypot(*(np.array([(G.nodes[n]["x"], G.nodes[n]["y"]) for n in node_ids]) - start_xy).T)  # fmt: skip
-start = node_ids[gaps.argmin()]
+# %% Start at the Park Centre (the nearest node to it)
+start = psp.nearest_node(G, *psp.PARK_CENTRE_LAT_LON)
 on = {G.edges[start, n]["name"] for n in G[start]}
-print(f"Start: node {start}, {gaps.min():.0f} m from the Park Centre, on {on}")
+print(f"Start: node {start}, on {on}")
 
 # %% Contract: junction-to-junction edges
 H = routing.contract(G, keep=[start])
@@ -93,7 +88,63 @@ def good(r):
 routes = routing.pick_distinct(
     [r for r in loops if good(r)], MAX_OVERLAP
 ) + routing.pick_distinct([r for r in out_and_backs if good(r)], MAX_OVERLAP)
+
+
+# %% Fill the gaps: loops so that the 7-10 km routes, run as a set, cover every
+# trail a good 7-10 km loop can reach (random turn points miss trails close to
+# the start and at the far north end).
+def trail_km(selected):
+    run = {routing.edge_id(*s) for r in selected for s in r["steps"]}
+    return sum(p[2] for e in run for p in H.edges[e]["pieces"] if p[1] == "park trail") / 1000  # fmt: skip
+
+
+focus = [r for r in routes if FOCUS_KM[0] * 1000 <= r["length_m"] <= FOCUS_KM[1] * 1000]
+fillers = routing.cover_gaps(H, start, routes, FOCUS_KM[0] * 1000, FOCUS_KM[1] * 1000, good)  # fmt: skip
+all_trail_km = trail_km([{"steps": list(H.edges(keys=True))}])
+print(
+    f"7-10 km routes cover {trail_km(focus):.1f} of {all_trail_km:.1f} km of park trail; "
+    f"{len(fillers)} added loops take that to {trail_km(focus + fillers):.1f} km"
+)
+routes += fillers
 routes.sort(key=lambda r: (r["type"] != "loop", r["length_m"]))
+
+
+# %% Coverage report for the About page: how much the 7-10 km routes run, and
+# the trail bits they don't (with where to find them)
+def stretch_name(e):
+    return next((p[0] for p in H.edges[e]["pieces"] if p[0]), "(unnamed)")
+
+
+run_710 = {routing.edge_id(*s) for r in focus + fillers for s in r["steps"]}
+run_all = {routing.edge_id(*s) for r in routes for s in r["steps"]}
+to_lon_lat = pyproj.Transformer.from_crs(psp.CRS_METRIC, psp.CRS_WGS84, always_xy=True)
+uncovered = []
+for u, v, k in H.edges(keys=True):
+    e = routing.edge_id(u, v, k)
+    metres = sum(p[2] for p in H.edges[e]["pieces"] if p[1] == "park trail")
+    if metres > 0 and e not in run_710:
+        middle = H.edges[e]["nodes"][len(H.edges[e]["nodes"]) // 2]
+        lon, lat = to_lon_lat.transform(G.nodes[middle]["x"], G.nodes[middle]["y"])
+        uncovered.append(
+            {
+                "trail": routing.clean_name(stretch_name(e)),
+                "m": round(metres),
+                "dead_end": H.degree(u) == 1 or H.degree(v) == 1,
+                "in_other_routes": e in run_all,
+                "lat": round(lat, 5),
+                "lon": round(lon, 5),
+            }
+        )
+coverage = {
+    "park_trail_km": round(all_trail_km, 1),
+    "band_km": list(FOCUS_KM),
+    "band_routes": len(focus) + len(fillers),
+    "band_trail_km": round(trail_km(focus + fillers), 1),
+    "added_for_coverage": len(fillers),
+    "all_routes_trail_km": round(trail_km(routes), 1),
+    "uncovered": sorted(uncovered, key=lambda x: -x["m"]),
+}
+pd.DataFrame(coverage["uncovered"])
 
 summary = pd.DataFrame(
     [{"type": r["type"], "km": r["length_m"] / 1000} for r in routes]
@@ -163,6 +214,7 @@ for r in routes:
 psp.DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
 out = psp.DATA_PROCESSED / "routes.geojson"
 out.write_text(json.dumps({"type": "FeatureCollection", "features": features}))
+(psp.DATA_PROCESSED / "coverage.json").write_text(json.dumps(coverage))
 print(
     f"Saved {len(features)} routes ({counters['loop']} loops, "
     f"{counters['out-and-back']} out-and-backs), {out.stat().st_size / 1e6:.2f} MB"

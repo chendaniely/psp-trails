@@ -492,7 +492,16 @@ def _junction(G, H, prev, step):
     return f"{how.title()} {side} {onto}", f"{ARROWS[how, side]} {short}"
 
 
-def directions(G, H, steps, start="the Park Centre", landmarks=(), merge_m=30):
+def directions(
+    G,
+    H,
+    steps,
+    start="the Park Centre",
+    landmarks=(),
+    merge_m=30,
+    stop_at_turnaround=True,
+    optional=frozenset(),
+):
     """Turn-by-turn directions: [[km, full text, short text], ...].
 
     Instructions come at junctions where the route turns, forks or changes
@@ -500,6 +509,11 @@ def directions(G, H, steps, start="the Park Centre", landmarks=(), merge_m=30):
     ("T← Salish", "Y↗ Council"). Instructions within `merge_m` of each other
     are joined ("Cross W 16th Ave, then turn left onto ..."). `landmarks` are
     (x, y, label) points, e.g. toilets, mentioned when a junction is near one.
+
+    An out-and-back route ends its directions at the turnaround
+    (`stop_at_turnaround`); a long route turns around at dead ends and carries
+    on. Steps whose edge is in `optional` (edge ids of offshoots) are flagged
+    where the route turns onto them.
     """
     chain, pieces = _oriented(H, steps[0])
     octant = round(_heading(G, chain) / (math.pi / 4)) % 8
@@ -514,10 +528,16 @@ def directions(G, H, steps, start="the Park Centre", landmarks=(), merge_m=30):
     at = H.edges[steps[0]]["length"]
     crossing_before, crossing_at = None, None
     mentioned = {}  # landmark -> metres where we last mentioned it
-    for prev, step in pairwise(steps):
+    for i, (prev, step) in enumerate(pairwise(steps), start=1):
         if edge_id(*prev) == edge_id(*step) and step[0] == prev[1]:
-            out.append([at, "Turn around and return the same way", "↩ Turn around"])
-            break
+            if stop_at_turnaround:
+                out.append([at, "Turn around and return the same way", "↩ Turn around"])
+                break
+            back = _label(_oriented(H, prev)[1][::-1])
+            out.append([at, f"Dead end: turn around, back along {back}", "↩ back"])
+            crossing_before = None
+            at += H.edges[step]["length"]
+            continue
         chain, pieces = _oriented(H, step)
         street, after = _street_crossed(G, chain, pieces)
         here = _label(_oriented(H, prev)[1][::-1])
@@ -533,6 +553,17 @@ def directions(G, H, steps, start="the Park Centre", landmarks=(), merge_m=30):
             out[crossing_at][2] += f" to {after}"
         elif not street:
             text = _junction(G, H, prev, step)
+        if edge_id(*step) in optional and edge_id(*prev) not in optional:
+            # The start of an offshoot: say so, and how far it goes.
+            run = 0.0
+            for later in steps[i:]:
+                if edge_id(*later) not in optional:
+                    break
+                run += H.edges[later]["length"]
+            there = _label(pieces)
+            full, short = text or (f"Onto {there}", f"→ {there}")
+            how_far = f"Optional out-and-back, {run / 2000:.1f} km each way"
+            text = (f"{how_far}: {full[0].lower()}{full[1:]}", f"(optional) {short}")
         crossing_before = street
         if text:
             full, short = text
@@ -561,3 +592,153 @@ def directions(G, H, steps, start="the Park Centre", landmarks=(), merge_m=30):
         else:
             merged.append([metres, full, short])
     return [[round(m / 1000, 2), full, short] for m, full, short in merged]
+
+
+# Covering every trail ------------------------------------------------------------
+
+
+def _cheapest(H, u, v):
+    return min(H[u][v], key=lambda k: H[u][v][k]["cost"])
+
+
+def _cost(u, v, parallel):
+    return min(d["cost"] for d in parallel.values())
+
+
+def offshoots(H, max_m=400):
+    """Edge ids on short dead-end branches: offshoots you can only run out and back.
+
+    Peel dead ends off the network until none are left; what was peeled hangs
+    off the rest in small trees, one per branch. Branches of at most `max_m`
+    in total count. A trail that ends at a street isn't a dead end, because
+    the street is in the network too.
+    """
+    degree = dict(H.degree())
+    peeled, gone = set(), set()
+    queue = [n for n, d in degree.items() if d == 1]
+    while queue:
+        n = queue.pop()
+        if n in gone or degree[n] != 1:
+            continue
+        for u, v, k in H.edges(n, keys=True):
+            if edge_id(u, v, k) not in peeled:
+                peeled.add(edge_id(u, v, k))
+                gone.add(n)
+                other = v if u == n else u
+                degree[other] -= 1
+                if degree[other] == 1:
+                    queue.append(other)
+                break
+    branches = nx.Graph()
+    branches.add_nodes_from(gone)
+    branches.add_edges_from((a, b) for a, b, _ in peeled if a in gone and b in gone)
+    short = set()
+    for branch in nx.connected_components(branches):
+        edges = {e for e in peeled if e[0] in branch or e[1] in branch}
+        if sum(H.edges[e]["length"] for e in edges) <= max_m:
+            short |= edges
+    return short
+
+
+def postman_route(H, required, start):
+    """A short closed walk from `start` that runs every edge in `required`.
+
+    The route inspection ("Chinese postman") recipe, for when only some edges
+    must be run (here: park trails) and the rest (streets) may link them:
+
+    1. join the required edges' separate pieces, and the start, with the
+       cheapest paths between them (a minimum spanning tree of pieces);
+    2. make every junction even by pairing up the odd ones with the cheapest
+       set of extra paths (minimum-weight perfect matching): those are the
+       stretches run twice;
+    3. walk the result as one Euler circuit from the start.
+
+    Costs are the same as for loops, so the extra stretches prefer trails.
+    Returns steps (u, v, key) in H.
+    """
+    A = nx.MultiGraph()
+    A.add_node(start)
+    for a, b, k in required:
+        A.add_edge(a, b, h=k)
+
+    def add_path(nodes):
+        for u, v in pairwise(nodes):
+            A.add_edge(u, v, h=_cheapest(H, u, v))
+
+    pieces = [set(c) for c in nx.connected_components(A)]
+    if len(pieces) > 1:
+        between = nx.Graph()
+        for i, piece in enumerate(pieces):
+            dist, paths = nx.multi_source_dijkstra(H, piece, weight=_cost)
+            for j in range(i + 1, len(pieces)):
+                cost, end = min((dist[n], n) for n in pieces[j] if n in dist)
+                between.add_edge(i, j, weight=cost, path=paths[end])
+        for _, _, d in nx.minimum_spanning_edges(between, data=True):
+            add_path(d["path"])
+
+    odd = [n for n in A if A.degree(n) % 2]
+    pairs, paths = nx.Graph(), {}
+    for n in odd:
+        dist, found = nx.single_source_dijkstra(H, n, weight=_cost)
+        for m in odd:
+            if m != n and not pairs.has_edge(n, m):
+                pairs.add_edge(n, m, weight=dist[m])
+                paths[n, m] = found[m]
+    for n, m in nx.min_weight_matching(pairs):
+        add_path(paths[n, m] if (n, m) in paths else paths[m, n][::-1])
+
+    return [
+        (u, v, A.edges[u, v, key]["h"])
+        for u, v, key in nx.eulerian_circuit(A, source=start, keys=True)
+    ]
+
+
+def cover_gaps(H, start, routes, min_m, max_m, good, tries=40, seed=3):
+    """Loops to add so that, together, the routes run every trail they can.
+
+    Finds trail stretches (edges with park trail) that no route between
+    `min_m` and `max_m` runs yet, longest first, and for each builds loops
+    that go through it: start -> one end, along it, then home directly or via
+    a random trail junction. The best one that passes `good` (most trail) is
+    added, and whatever else it runs counts as covered too. Stretches no good
+    loop in the band can reach stay uncovered.
+    """
+    rng = random.Random(seed)
+    waypoints = list(_waypoints(H, start))
+
+    def trail_m(e):
+        return sum(p[2] for p in H.edges[e]["pieces"] if p[1] == "park trail")
+
+    in_band = [r for r in routes if min_m <= r["length_m"] <= max_m]
+    covered = {edge_id(*s) for r in in_band for s in r["steps"]}
+    gaps = sorted(
+        (
+            e
+            for e in (edge_id(u, v, k) for u, v, k in H.edges(keys=True))
+            if trail_m(e) > 0
+        ),
+        key=lambda e: (-trail_m(e), e),
+    )
+    added = []
+    for u, v, k in gaps:
+        if (u, v, k) in covered:
+            continue
+        best = None
+        for a, b in ((u, v), (v, u)):
+            there = cheapest_path(H, start, a) + [(a, b, k)]
+            run = {edge_id(*s) for s in there}
+            for attempt in range(tries):
+                via = [rng.choice(waypoints)] if attempt else []  # first: straight home
+                steps, used = list(there), set(run)
+                for x, y in pairwise([b, *via, start]):
+                    leg = cheapest_path(H, x, y, used)
+                    steps += leg
+                    used |= {edge_id(*s) for s in leg}
+                r = {"type": "loop", "steps": steps, **route_stats(H, steps)}
+                fits = min_m <= r["length_m"] <= max_m and good(r)
+                if fits and (best is None or r["trail_share"] > best["trail_share"]):
+                    best = r
+        if best:
+            added.append(best)
+            covered |= {edge_id(*s) for s in best["steps"]}
+    return added

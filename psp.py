@@ -42,6 +42,11 @@ METROVAN_PARKS_LAYER = (
 )
 PARK_METROVAN_CODE = "PAC"
 
+# Where our runs start and finish: the Park Centre (ranger station) on
+# Cleveland Trail at W 16th Ave, by the toilets and drinking water. OSM
+# "Park Centre" information point, node 317125595.
+PARK_CENTRE_LAT_LON = (49.25918, -123.22248)
+
 # How far past the park boundary to fetch neighbouring streets and paths, so
 # trails can be linked up via streets instead of doubling back.
 BUFFER_M = 400
@@ -328,3 +333,13 @@ def walk_graph(
             for n, z in zip(on_graph[1:-1], flat):
                 G.nodes[n]["z"] = float(z)
     return G
+
+
+def nearest_node(G: nx.Graph, lat: float, lon: float):
+    """The graph node closest to a point (graph nodes carry x, y in CRS_METRIC)."""
+    x, y = pyproj.Transformer.from_crs(CRS_WGS84, CRS_METRIC, always_xy=True).transform(
+        lon, lat
+    )
+    nodes = list(G.nodes)
+    xy = np.array([(G.nodes[n]["x"], G.nodes[n]["y"]) for n in nodes])
+    return nodes[int(np.hypot(*(xy - (x, y)).T).argmin())]

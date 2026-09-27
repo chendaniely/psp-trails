@@ -350,3 +350,104 @@ def test_a_landmark_is_mentioned_once_not_at_every_nearby_junction():
     toilets = [(-10.0, 5.0, "toilets")]
     cues = routing.directions(G, H, steps, landmarks=toilets)
     assert cues[1][2] == "T← Top (WC) · → Long"
+
+
+# Covering every trail (the ultra) -----------------------------------------------
+
+
+def covered(steps):
+    return {routing.edge_id(*s) for s in steps}
+
+
+def assert_closed_walk(steps, start):
+    assert steps[0][0] == start and steps[-1][1] == start
+    assert all(s[1] == t[0] for s, t in itertools.pairwise(steps))
+
+
+def test_postman_route_covers_every_required_edge_and_comes_home():
+    H = routing.contract(grid(4), keep=[(0, 0)])
+    required = {routing.edge_id(u, v, k) for u, v, k in H.edges(keys=True)}
+    steps = routing.postman_route(H, required, (0, 0))
+
+    assert_closed_walk(steps, (0, 0))
+    assert covered(steps) >= required
+    total = sum(H.edges[s]["length"] for s in steps)
+    trail = sum(H.edges[e]["length"] for e in required)
+    assert trail <= total <= 1.6 * trail  # some repeats are unavoidable
+
+
+def test_postman_route_uses_a_street_only_to_connect_trails():
+    # Two square trail loops joined by a street; the start is on the first.
+    sq = [(0, 0), (100, 0), (100, 100), (0, 100)]
+    coords = {f"a{i}": xy for i, xy in enumerate(sq)}
+    coords |= {f"b{i}": (x + 300, y) for i, (x, y) in enumerate(sq)}
+    edges = [(f"{s}{i}", f"{s}{(i + 1) % 4}", 100, f"Loop {s}", "park trail")
+             for s in "ab" for i in range(4)]  # fmt: skip
+    edges.append(("a1", "b0", 200, "W 16th Ave", "street"))
+    H = routing.contract(make_graph(edges, coords), keep=["a0"])
+    required = {
+        routing.edge_id(u, v, k)
+        for u, v, k, d in H.edges(keys=True, data=True)
+        if d["pieces"][0][1] == "park trail"
+    }
+    steps = routing.postman_route(H, required, "a0")
+
+    assert_closed_walk(steps, "a0")
+    assert covered(steps) >= required
+    street = [s for s in steps if H.edges[s]["pieces"][0][1] == "street"]
+    assert len(street) == 2  # there and back, nothing more
+
+
+def test_short_dead_end_offshoots_are_found():
+    # A loop with a 100 m offshoot (optional) and an 800 m one (not "short").
+    coords = {"a": (0, 0), "b": (100, 0), "c": (100, 100), "d": (0, 100),
+              "s": (150, 0), "t": (100, -400), "u": (100, -800)}  # fmt: skip
+    edges = [("a", "b", 100, "Loop", "park trail"), ("b", "c", 100, "Loop", "park trail"),
+             ("c", "d", 100, "Loop", "park trail"), ("d", "a", 100, "Loop", "park trail"),
+             ("b", "s", 100, "Spur", "park trail"),
+             ("c", "t", 400, "Long", "park trail"), ("t", "u", 400, "Long", "park trail")]  # fmt: skip
+    H = routing.contract(make_graph(edges, coords), keep=["a"])
+    optional = routing.offshoots(H, max_m=400)
+
+    assert {tuple(sorted(e[:2])) for e in optional} == {("b", "s")}
+
+
+def test_directions_can_continue_after_an_offshoot():
+    # Start -> J -> out to a 100 m dead end and back -> on round the loop.
+    coords = {"S": (0, -200), "J": (0, 0), "E": (0, 100), "K": (200, 0)}
+    edges = [("S", "J", 200, "Salal", "park trail"), ("J", "E", 100, "Spur", "park trail"),
+             ("J", "K", 200, "Heron", "park trail"), ("K", "S", 300, "Loop back", "park trail")]  # fmt: skip
+    G = make_graph(edges, coords)
+    H = routing.contract(G, keep=["S", "K"])  # K has two neighbours: keep it
+
+    def step(a, b):
+        return next((a, b, k) for k in H[a][b])
+
+    steps = [
+        step("S", "J"),
+        step("J", "E"),
+        step("E", "J"),
+        step("J", "K"),
+        step("K", "S"),
+    ]
+    texts = [d[1] for d in routing.directions(G, H, steps, stop_at_turnaround=False)]
+
+    turn = next(i for i, t in enumerate(texts) if t.startswith("Dead end: turn around"))
+    assert any("Heron" in t for t in texts[turn:])  # carries on after the offshoot
+    assert texts[-1].startswith("Finish")
+
+
+def test_cover_gaps_adds_loops_until_every_trail_is_run():
+    start = (0, 0)
+    H = routing.contract(grid(5), keep=[start])  # 4 km of trail, 100 m blocks
+
+    def good(r):
+        return r["repeat_share"] <= 0.15
+
+    added = routing.cover_gaps(H, start, [], 800, 2400, good)
+
+    run = {routing.edge_id(*s) for r in added for s in r["steps"]}
+    assert run == {routing.edge_id(u, v, k) for u, v, k in H.edges(keys=True)}
+    for r in added:
+        assert r["type"] == "loop" and 800 <= r["length_m"] <= 2400 and good(r)
+        assert r["steps"][0][0] == start and r["steps"][-1][1] == start

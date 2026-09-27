@@ -354,6 +354,95 @@ function shareButton(f) {
   return button;
 }
 
+// Image: the route as a picture for Strava, Instagram or the group chat.
+// 1080 x 1350 (4:5 portrait): the map as shown, name, stats, elevation, the
+// trails in order, and credits.
+async function routeImage(f) {
+  const p = f.properties;
+  const W = 1080, H = 1350, pad = 48;
+  const font = (weight, size) => `${weight} ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  const canvas = Object.assign(document.createElement("canvas"), {width: W, height: H});
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fcfcfb";
+  ctx.fillRect(0, 0, W, H);
+
+  // The map, read straight after it draws (cover-fit into the top of the image).
+  const snapshot = await new Promise((resolve) => {
+    map.once("render", () => resolve(map.getCanvas().toDataURL("image/png")));
+    map.triggerRepaint();
+  });
+  const img = new Image();
+  await new Promise((resolve) => { img.onload = resolve; img.src = snapshot; });
+  const mapH = 760, scale = Math.max(W / img.width, mapH / img.height);
+  const [sw, sh] = [W / scale, mapH / scale];
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, W, mapH);
+
+  // Name (shrunk to fit), stats and start.
+  let y = mapH + 70, size = 52;
+  ctx.fillStyle = "#0b0b0b";
+  do { ctx.font = font(700, size); size -= 2; } while (ctx.measureText(p.name).width > W - 2 * pad);
+  ctx.fillText(p.name, pad, y);
+  ctx.font = font(600, 32);
+  ctx.fillText(`${p.km.toFixed(1)} km ${p.type} · ↑${p.gain_m} m ↓${p.loss_m} m · ${p.trail_pct}% trail`, pad, y += 52);
+  ctx.fillStyle = "#52514e";
+  ctx.font = font(400, 24);
+  ctx.fillText("Start/finish: Park Centre, Cleveland Trail & W 16th Ave · Pacific Spirit Regional Park", pad, y += 40);
+
+  // Elevation line.
+  const prof = p.profile, top = y + 24, h = 90;
+  const [lo, hi] = [d3.min(prof, (d) => d[1]), d3.max(prof, (d) => d[1])];
+  const px = (km) => pad + (km / p.km) * (W - 2 * pad);
+  const py = (m) => top + h - ((m - lo) / Math.max(hi - lo, 1)) * h;
+  ctx.beginPath();
+  prof.forEach(([km, m], i) => (i ? ctx.lineTo(px(km), py(m)) : ctx.moveTo(px(km), py(m))));
+  ctx.lineTo(px(p.km), top + h); ctx.lineTo(px(0), top + h); ctx.closePath();
+  ctx.fillStyle = "rgba(42, 120, 214, 0.15)"; ctx.fill();
+  ctx.beginPath();
+  prof.forEach(([km, m], i) => (i ? ctx.lineTo(px(km), py(m)) : ctx.moveTo(px(km), py(m))));
+  ctx.strokeStyle = "#2a78d6"; ctx.lineWidth = 3; ctx.stroke();
+
+  // The trails, in running order.
+  const unnamed = new Set(["unnamed trail", "crossing", "path", "sidewalk", "street"]);
+  const trails = p.cues.map(([label]) => label.replace(/ Trail$/, ""))
+    .filter((t, i, all) => !unnamed.has(t) && !t.startsWith("Cross ") && t !== all[i - 1]);
+  ctx.fillStyle = "#0b0b0b";
+  ctx.font = font(500, 26);
+  let line = "", ty = top + h + 56;
+  for (const word of trails.join(" › ").split(" ")) {
+    if (ctx.measureText(`${line} ${word}`).width > W - 2 * pad && line) {
+      ctx.fillText(line, pad, ty); ty += 36; line = word;
+    } else line = line ? `${line} ${word}` : word;
+    if (ty > H - 90) break;
+  }
+  if (ty <= H - 90) ctx.fillText(line, pad, ty);
+
+  // Footer.
+  ctx.fillStyle = "#52514e";
+  ctx.font = font(400, 20);
+  ctx.fillText(`pstrunners.github.io · route ${p.id}`, pad, H - 32);
+  ctx.textAlign = "right";
+  ctx.fillText("Map © OpenStreetMap contributors · OpenFreeMap", W - pad, H - 32);
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+}
+
+function imageButton(f) {
+  const button = html`<button class="btn btn-quarto" type="button">Image</button>`;
+  button.onclick = async () => {
+    const blob = await routeImage(f);
+    const file = new File([blob], `psp-${f.properties.id}.png`, {type: "image/png"});
+    if (navigator.canShare?.({files: [file]})) {
+      await navigator.share({files: [file], title: f.properties.name})
+        .catch((e) => { if (e.name !== "AbortError") throw e; });
+    } else {
+      const a = Object.assign(document.createElement("a"),
+        {href: URL.createObjectURL(blob), download: file.name});
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+  };
+  return button;
+}
+
 route
   ? html`<div class="route-actions">
       ${DOM.download(
@@ -362,6 +451,7 @@ route
         "Download GPX"
       )}
       ${shareButton(route)}
+      ${imageButton(route)}
     </div>`
   : html``
 ```

@@ -1,0 +1,235 @@
+---
+title: "Ultra"
+subtitle: "Every trail in Pacific Spirit, in one run from the Park Centre"
+format:
+  html:
+    include-in-header:
+      text: |
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+---
+
+One route that runs every trail in the park at least once, starting and
+finishing at the **Park Centre** (the ranger station on Cleveland Trail at
+W 16th Ave). It's also the aid station: park for free along W 16th Ave,
+right in the middle of the park, and there are toilets and drinking water.
+The route comes back past it along the way.
+
+```{ojs}
+//| echo: false
+ultra = FileAttachment("ultra.json").json()
+labels = FileAttachment("labels.geojson").json()
+stats = ultra.stats
+
+function kmRange([a, b]) {
+  const [from, to] = [Math.round(a), Math.round(b)];
+  return from === to ? `km ${from}` : `km ${from}–${to}`;
+}
+
+html`<div class="route-card">
+  <p class="route-stats">
+    <strong>${stats.km} km</strong> ·
+    <strong>↑ ${stats.gain_m} m ↓ ${stats.loss_m} m</strong> ·
+    every trail (${stats.trail_km} of ${stats.park_trail_km} km of park trail) ·
+    ${stats.repeat_km} km run twice · ${stats.street_pct}% street
+  </p>
+  <p class="route-stats">
+    <strong>Aid station</strong> (Park Centre): start,
+    ${stats.aid.slice(1, -1).map(kmRange).join(", ")}, finish ·
+    <strong>Toilets on the way</strong>: ${stats.on_the_way.map(kmRange).join(", ")}
+  </p>
+  <p class="route-id">Short dead-end offshoots are optional: without them it's
+    ${stats.km_without_offshoots} km (they add ${stats.offshoot_km} km, out and back).</p>
+</div>`
+```
+
+```{ojs}
+//| echo: false
+mapDiv = html`<div class="route-map ultra-map"></div>`
+```
+
+```{ojs}
+//| echo: false
+html`<div class="ultra-legend">
+  <span><i style="background:#2a78d6"></i>first time along</span>
+  <span><i style="background:#eb6834"></i>run a second time</span>
+  <span><i class="dashed"></i>optional offshoot</span>
+  <span><b class="km">5</b>km marker</span>
+  <span><b class="wc">WC</b>toilets</span>
+</div>`
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+maplibregl = require("maplibre-gl@5.24.0/dist/maplibre-gl.js")
+START = [-123.22248, 49.25918] // Park Centre
+EMPTY = ({type: "FeatureCollection", features: []})
+
+map = {
+  const m = new maplibregl.Map({
+    container: mapDiv,
+    style: "https://tiles.openfreemap.org/styles/positron",
+    center: START,
+    zoom: 12.5,
+    attributionControl: {customAttribution: "Trails © OpenStreetMap contributors (ODbL)"}
+  });
+  m.addControl(new maplibregl.NavigationControl(), "top-right");
+  m.addControl(new maplibregl.FullscreenControl(), "top-right");
+  await new Promise((resolve) => m.on("load", resolve));
+  m.addSource("labels", {type: "geojson", data: labels});
+  m.addSource("segments", {type: "geojson", data: ultra.segments});
+  m.addSource("points", {type: "geojson", data: ultra.points});
+  m.addSource("hover", {type: "geojson", data: EMPTY});
+  const round = {"line-join": "round", "line-cap": "round"};
+  const width = ["interpolate", ["linear"], ["zoom"], 12, 2.5, 16, 5];
+  const kind = (k) => ["==", ["get", "class"], k];
+  m.addLayer({id: "trails", type: "line", source: "labels", layout: round,
+              filter: ["==", ["get", "kind"], "trail"],
+              paint: {"line-color": "#6b8f71", "line-opacity": 0.6, "line-width": 1}});
+  // Stretches run twice are drawn beside the first pass, so both show.
+  m.addLayer({id: "repeat", type: "line", source: "segments", layout: round, filter: kind("repeat"),
+              paint: {"line-color": "#eb6834", "line-width": width, "line-offset": 3}});
+  m.addLayer({id: "first", type: "line", source: "segments", layout: round, filter: kind("first"),
+              paint: {"line-color": "#2a78d6", "line-width": width}});
+  m.addLayer({id: "optional", type: "line", source: "segments", filter: kind("optional"),
+              paint: {"line-color": "#4a3aa7", "line-width": width, "line-dasharray": [1, 1]}});
+  m.addLayer({id: "arrows", type: "symbol", source: "segments",
+              layout: {"symbol-placement": "line", "symbol-spacing": 120, "text-field": "›",
+                       "text-font": ["Noto Sans Bold"], "text-size": 18,
+                       "text-keep-upright": false, "text-allow-overlap": true,
+                       "text-ignore-placement": true},
+              paint: {"text-color": "#0b0b0b"}});
+  const halo = {"text-halo-color": "#fcfcfb", "text-halo-width": 1.5};
+  const along = (size, font) => ({"symbol-placement": "line", "text-field": ["get", "name"],
+    "text-font": [font], "text-size": size, "text-max-angle": 45, "symbol-spacing": 250});
+  m.addLayer({id: "street-labels", type: "symbol", source: "labels", minzoom: 13,
+              filter: ["==", ["get", "kind"], "street"], layout: along(10.5, "Noto Sans Regular"),
+              paint: {"text-color": "#52514e", ...halo}});
+  m.addLayer({id: "trail-labels", type: "symbol", source: "labels", minzoom: 13,
+              filter: ["==", ["get", "kind"], "trail"], layout: along(11, "Noto Sans Italic"),
+              paint: {"text-color": "#3d6b47", ...halo}});
+  // km markers and toilets
+  m.addLayer({id: "km", type: "circle", source: "points", filter: ["==", ["get", "kind"], "km"],
+              paint: {"circle-radius": 11, "circle-color": "#fcfcfb",
+                      "circle-stroke-color": "#0b0b0b", "circle-stroke-width": 2}});
+  m.addLayer({id: "km-labels", type: "symbol", source: "points", filter: ["==", ["get", "kind"], "km"],
+              layout: {"text-field": ["get", "label"], "text-font": ["Noto Sans Bold"],
+                       "text-size": 11, "text-allow-overlap": true},
+              paint: {"text-color": "#0b0b0b"}});
+  m.addLayer({id: "wc", type: "circle", source: "points", filter: ["==", ["get", "kind"], "toilets"],
+              paint: {"circle-radius": 7, "circle-color": "#eda100",
+                      "circle-stroke-color": "#fcfcfb", "circle-stroke-width": 2}});
+  m.addLayer({id: "hover", type: "circle", source: "hover",
+              paint: {"circle-radius": 7, "circle-color": "#eb6834",
+                      "circle-stroke-color": "#fcfcfb", "circle-stroke-width": 2}});
+  new maplibregl.Marker({color: "#0b0b0b"})
+    .setLngLat(START)
+    .setPopup(new maplibregl.Popup().setText("Start, finish and aid station: Park Centre"))
+    .addTo(m);
+  const bounds = new maplibregl.LngLatBounds();
+  ultra.full.forEach((c) => bounds.extend(c));
+  m.fitBounds(bounds, {padding: 30, duration: 0});
+  invalidation.then(() => m.remove());
+  return m;
+}
+```
+
+```{ojs}
+//| echo: false
+profile = ultra.profile.map(([km, m, lon, lat]) => ({km, m, lon, lat}))
+
+viewof here = {
+  const low = Math.floor((d3.min(profile, (d) => d.m) - 5) / 10) * 10;
+  return Plot.plot({
+    width,
+    height: 180,
+    marginLeft: 44,
+    style: {fontSize: "12px"},
+    x: {label: "km →", domain: [0, stats.km]},
+    y: {label: "↑ elevation (m)", domain: [low, d3.max(profile, (d) => d.m) + 5], grid: true},
+    marks: [
+      Plot.areaY(profile, {x: "km", y1: low, y2: "m", fill: "#2a78d6", fillOpacity: 0.12}),
+      Plot.lineY(profile, {x: "km", y: "m", stroke: "#2a78d6", strokeWidth: 1.5}),
+      // Aid station passes
+      Plot.ruleX(stats.aid.map(([a]) => a), {stroke: "#0b0b0b", strokeDasharray: "3,3"}),
+      Plot.ruleX(profile, Plot.pointerX({x: "km", stroke: "#52514e"})),
+      Plot.dot(profile, Plot.pointerX({x: "km", y: "m", fill: "#eb6834", r: 4})),
+      Plot.tip(profile, Plot.pointerX({x: "km", y: "m",
+        title: (d) => `${d.km.toFixed(1)} km · ${Math.round(d.m)} m`}))
+    ]
+  });
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+map.getSource("hover").setData(
+  here?.lon
+    ? {type: "Feature", geometry: {type: "Point", coordinates: [here.lon, here.lat]}}
+    : EMPTY
+)
+```
+
+Dashed lines on the profile are the passes by the aid station.
+
+```{ojs}
+//| echo: false
+function gpx(name, coordinates) {
+  const points = coordinates.map(([lon, lat]) => `<trkpt lat="${lat}" lon="${lon}"></trkpt>`);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="psp-trails" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${name}</name>
+    <trkseg>
+      ${points.join("\n      ")}
+    </trkseg>
+  </trk>
+</gpx>`;
+}
+
+html`<div class="route-actions">
+  ${DOM.download(
+    () => new Blob([gpx(`Pacific Spirit every trail (${stats.km} km)`, ultra.full)],
+                   {type: "application/gpx+xml"}),
+    "psp-every-trail.gpx",
+    "Download GPX"
+  )}
+  ${DOM.download(
+    () => new Blob([gpx(`Pacific Spirit every trail, no offshoots (${stats.km_without_offshoots} km)`, ultra.main)],
+                   {type: "application/gpx+xml"}),
+    "psp-every-trail-no-offshoots.gpx",
+    "GPX without offshoots"
+  )}
+</div>`
+```
+
+### Directions
+
+```{ojs}
+//| echo: false
+html`<details class="cue-details"><summary>All ${ultra.directions.length} turns</summary>
+  <ol class="directions">${ultra.directions.map(([km, full]) =>
+    html`<li class=${full.startsWith("Optional") ? "optional" : ""}><span class="at-km">${km.toFixed(1)}</span> ${full}</li>`
+  )}</ol>
+</details>`
+```
+
+### Where this idea comes from
+
+Running every trail in Pacific Spirit as one ultra isn't our idea: there's an
+existing Pacific Spirit Park ultra route that inspired this page. We'll link
+it, and its GPX, here. What's on this page is our own version, worked out
+from the trail data by code.
+
+### How it's made
+
+Finding the shortest run that covers every trail is a classic puzzle, the
+*route inspection* or "Chinese postman" problem. Every junction needs as
+many ways in as ways out; where a junction doesn't have that (a dead end, or
+three trails meeting), some stretch has to be run twice. The script
+(`08_plan_ultra.py`) joins the trail network into one piece, picks the
+cheapest set of stretches to run twice (preferring trails over streets), and
+then walks it all as one loop from the Park Centre. Dead-end offshoots of up
+to 400 m are marked optional. It uses the same trail data and edits as the
+Routes page; see [About](about.qmd).

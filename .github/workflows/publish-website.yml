@@ -50,7 +50,12 @@ jobs:
       - name: Generate routes from the Park Centre (step 07)
         run: |
           uv run python 07_generate_routes.py
-          cp data/processed/routes.geojson website/routes.geojson
+          cp data/processed/routes.geojson data/processed/coverage.json website/
+
+      - name: Plan the every-trail ultra (step 08)
+        run: |
+          uv run python 08_plan_ultra.py
+          cp data/processed/ultra.json website/
 
       - uses: quarto-dev/quarto-actions/setup@v2
 

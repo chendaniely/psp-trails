@@ -45,7 +45,8 @@ editing helpers never hits the public servers.
 | 04 | classify ways, apply `data/manual/` edits | `data/processed/ways.gpkg` |
 | 05 | MapLibre map (via the `maplibre` Python package), plus trail/street names for the Routes map | `output/trail_map.html`, `output/labels.geojson` |
 | 06 | connection checks across Chancellor, University, W 16th + required links | `output/connection_check.csv` |
-| 07 | route library from the Park Centre | `data/processed/routes.geojson` |
+| 07 | route library from the Park Centre, plus a coverage report | `data/processed/routes.geojson`, `coverage.json` |
+| 08 | the ultra: one route over every park trail (route inspection) | `data/processed/ultra.json` |
 
 `data/raw/` is **committed**: it's the snapshot the manual edits' OSM ids refer
 to, and CI builds from it. CI never downloads. `data/processed/`, `output/`
@@ -94,6 +95,11 @@ and `cost`. A route is a list of steps `(u, v, key)`.
   best first, keep a route only if its edge set shares ≤75% (Jaccard) with
   every kept route. Knobs are constants at the top of 07 (226 routes today,
   ~100 loops in 7–10 km).
+- Coverage pass (`routing.cover_gaps`): after de-duplication, loops aimed at
+  trail stretches no 7–10 km route runs yet are added (start → one end →
+  along it → home, direct or via a random junction), so the 7–10 km set
+  covers ~99.6% of park trail. `coverage.json` lists what's left; the About
+  page shows it.
 - `id` (L01…, OB01…) is the position in the library, shortest first, and
   changes when the library does. `key` = sha1 of the route's node sequence,
   used for share links (`routes.html?route=<key>`).
@@ -107,6 +113,15 @@ and `cost`. A route is a list of steps `(u, v, key)`.
   (`T← Salish`, `Y↗ Council`). Tests in `tests/test_routing.py` build small
   synthetic graphs for each case; add one when changing this logic.
 
+**Ultra** (`08_plan_ultra.py`, `routing.postman_route`): required = junction
+stretches that are ≥50% park trail. Join the pieces with an MST of cheapest
+paths, pair odd junctions with `nx.min_weight_matching` over cheapest-path
+costs (those stretches are run twice), then `nx.eulerian_circuit` from the
+Park Centre. `routing.offshoots` peels dead ends to find short out-and-back
+branches (≤400 m), marked optional; `directions(..., stop_at_turnaround=False,
+optional=...)` keeps going past dead ends and flags them. Aid passes = within
+250 m of the Park Centre. ~68 km, 3 s to compute.
+
 **Website** (`website/`, Quarto): `index.qmd` iframes `trail_map.html`;
 `routes.qmd` is Observable JS reading `routes.geojson`:
 - Route of the day: routes matching the filters are shuffled with
@@ -117,6 +132,12 @@ and `cost`. A route is a list of steps `(u, v, key)`.
   `routing.trail_key` so "Salish" = "Salish Trail") draws faint trail lines
   and italic/grey labels; the route's own stretches (≥300 m, from the cue
   sheet) are named in bold at their midpoints and their faint labels hidden.
+- "Image" draws a 1080×1350 PNG on a canvas (map snapshot via
+  `map.once("render")` + `getCanvas()`, name, stats, elevation line, trail
+  sequence, credits) and shares or downloads it.
+- `ultra.qmd` reads `ultra.json`; `about.qmd` reads `coverage.json`. The
+  Ultra page credits an existing Pacific Spirit Park ultra route: add its
+  link/GPX there when Dan provides it.
 - Share uses the Web Share API (GPX file only where `navigator.canShare`
   allows; Chrome/Android doesn't for .gpx), else copies text to the clipboard.
 - Printable cards: `LAYOUTS` (2–12 per letter page; 8 = palm size). Text
