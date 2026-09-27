@@ -70,7 +70,7 @@ ultra: data/processed/ultra.json
 view: output/trail_map.html
 	$(PY) -m webbrowser "file://$(CURDIR)/$<"
 
-# Website: the Quarto site in website/ has the map as its front page. The
+# Website: the Quarto site in website/ (index.qmd is the home page). The
 # GitHub Action rebuilds and publishes it to the gh-pages branch on every push
 # to main, so these targets are only for looking at it locally.
 website/trail_map.html: output/trail_map.html

@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Trail network, route generator and website for a trail-running group in
-Pacific Spirit Regional Park (Vancouver, BC). Runs start and finish at the
+Trail network, route generator and website for the Pacific Spirit Trail
+Runners, a trail-running group in Pacific Spirit Regional Park (Vancouver,
+BC); that's also the site's title. Runs start and finish at the
 **Park Centre** (OSM node 317125595, Cleveland Trail at W 16th Ave). The site
-(Quarto, GitHub Pages) shows the trail map and a Routes page that picks a
-"route of the day" with elevation profile, written directions, GPX, share
-link and printable cards.
+(Quarto, GitHub Pages) has a home page, the trail map and a Routes page that
+picks a "route of the day" with elevation profile, written directions, GPX,
+share link and printable cards.
 
 Repo: <https://github.com/pstrunners/pstrunners.github.io> (the pstrunners
 organization's Pages repo, so the site is served at the root:
@@ -137,8 +138,14 @@ closest pass if 40–100 m off (labelled as a detour). ~62 km, 3 s to compute. A
 far from the rest can cost the ultra kilometres of detour: check the route and
 remove such stubs in `data/manual/` (as with the SW/NW Marine Dr stub).
 
-**Website** (`website/`, Quarto): `index.qmd` iframes `trail_map.html`;
-`routes.qmd` is Observable JS reading `routes.geojson`:
+**Website** (`website/`, Quarto): `index.qmd` is the landing page (team
+photo, intro, Facebook group and Strava club buttons, links into the site);
+`map.qmd` iframes `trail_map.html`; `routes.qmd` is Observable JS reading
+`routes.geojson`:
+- Team photo: goes in `website/images/team-photo.jpg`. Until it exists the
+  home page shows a CSS placeholder (`.hero-placeholder` in `styles.css`);
+  swapping it in is the one-line change described in a comment in
+  `index.qmd`. The photo scales to fit (no cropping), up to 75vh tall.
 - Route of the day: routes matching the filters are shuffled with
   mulberry32 seeded by FNV-1a of today's date in America/Vancouver
   (Fisher–Yates); order[0] is the route of the day, "Another route" steps
