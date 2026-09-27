@@ -1,0 +1,29 @@
+project:
+  type: website
+  # The map is built by the Python pipeline (step 04) and copied in by
+  # `make website` locally, or by the GitHub Action.
+  resources:
+    - trail_map.html
+
+website:
+  title: "Pacific Spirit Trails"
+  site-url: https://chendaniely.github.io/psp-trails/
+  repo-url: https://github.com/chendaniely/psp-trails
+  page-navigation: false
+  navbar:
+    left:
+      - href: index.qmd
+        text: Map
+      - href: about.qmd
+        text: About
+    right:
+      - href: trail_map.html
+        text: Full-screen map
+      - icon: github
+        href: https://github.com/chendaniely/psp-trails
+        aria-label: Source code on GitHub
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css

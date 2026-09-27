@@ -1,0 +1,54 @@
+name: Publish website
+
+# Rebuilds the map from the committed OSM snapshot in data/raw (no downloads
+# here: the public Overpass servers are too flaky for CI), renders the Quarto
+# site in website/, and pushes it to the gh-pages branch.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write # push the built site to gh-pages
+
+concurrency:
+  group: publish-website
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --locked
+
+      - name: Apply our edits and build the map (steps 03-04)
+        run: |
+          uv run python 03_apply_manual_edits.py
+          uv run python 04_map_trails.py
+          cp output/trail_map.html website/trail_map.html
+
+      - name: Check trail connections (step 05); stop if any fail
+        run: |
+          uv run python 05_check_connections.py
+          if grep -E ",(DETOUR|NOT CONNECTED)," output/connection_check.csv; then
+            echo "::error::A trail connection is broken; see the table above"
+            exit 1
+          fi
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Render and publish to gh-pages
+        uses: quarto-dev/quarto-actions/publish@v2
+        with:
+          target: gh-pages
+          path: website
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

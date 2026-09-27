@@ -1,0 +1,28 @@
+[project]
+name = "psp-trails"
+version = "0.1.0"
+description = "Pacific Spirit Regional Park trail network: download, clean, and route running paths"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "geopandas>=1.1.4",
+    "maplibre>=0.3.6",
+    "networkx>=3.7",
+    "osmnx>=2.1.1",
+    "requests>=2.34.2",
+    "shapely>=2.1.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff.lint]
+# Scripts are run cell-by-cell; a bare expression at the end of a cell
+# displays the value, so it isn't "useless".
+ignore = ["B018"]

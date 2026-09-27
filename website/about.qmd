@@ -1,0 +1,55 @@
+---
+title: "About"
+---
+
+A map of the trails in [Pacific Spirit Regional Park](https://metrovancouver.org/services/regional-parks/park/pacific-spirit-regional-park)
+(Vancouver, BC) and the streets around it, built for a running group. It's the
+first step towards generating routes: turning written directions into GPX and
+back, making loops or point-to-point runs of a given distance, and one day
+covering every trail in the park with as little backtracking as possible.
+
+## Reading the map
+
+- **Park trails** are coloured by bike access, the same split as the official
+  park map: <span style="color:#2a78d6">■</span> shared,
+  <span style="color:#eb6834">■</span> hiking only,
+  <span style="color:#1baf7a">■</span> not tagged either way.
+- Grey lines are streets, sidewalks and paths outside the park. We use them
+  sparingly, only to link trails without doubling back.
+- <span style="color:#eda100">●</span> **WC** marks toilets and
+  <span style="color:#e87ba4">●</span> **W** drinking water, useful when
+  planning long runs and aid stations. They come from OpenStreetMap: check
+  opening hours and seasonal closures before race day.
+- Hover a line for its name. Click it for its tags and a link to it on
+  OpenStreetMap.
+- The buttons at the top left turn layers on and off, including what we
+  removed from the network (red) and links we added (dotted black).
+
+On a phone, the [full-screen map](trail_map.html) is easier to use.
+
+## Our edits
+
+OpenStreetMap has more than we run and misses a few links we use, so we keep
+a small set of [edits](https://github.com/chendaniely/psp-trails/tree/main/data/manual):
+
+- NW and SW Marine Drive are the park's edge for us: beach and foreshore
+  trails below them are left out, as are a few dead-end stubs, parking-lot
+  spurs and school grounds.
+- Where a trail crosses W 16th Avenue but OSM never joined the two sides
+  (Cleveland Trail; Sword Fern to Douglas Fir), we add the missing link.
+- Every build checks that trails still connect across Chancellor Blvd,
+  University Blvd and W 16th Ave.
+
+## Data
+
+| Data | Source | Licence |
+|---|---|---|
+| Trails, streets, toilets, water | [OpenStreetMap](https://www.openstreetmap.org/relation/11683817) | © OpenStreetMap contributors, [ODbL](https://opendatacommons.org/licenses/odbl/) |
+| Park boundary | [Metro Vancouver open data](https://open-data-portal-metrovancouver.hub.arcgis.com/datasets/regional-parks-boundaries) | Open Government Licence – Metro Vancouver |
+| Basemap | [OpenFreeMap](https://openfreemap.org/) | © OpenMapTiles, data © OpenStreetMap contributors |
+
+If a public trail is missing or wrong, the best fix is in
+[OpenStreetMap](https://www.openstreetmap.org/) itself, so every map and app
+gets it. The code is on [GitHub](https://github.com/chendaniely/psp-trails).
+
+Please stay on marked trails and follow the park's rules on bikes and dogs.

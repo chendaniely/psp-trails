@@ -1,0 +1,30 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# osmnx download cache (re-created by the download scripts)
+data/cache/
+
+# Browser automation screenshots
+.playwright-mcp/
+
+.DS_Store
+
+# Generated: `make` rebuilds these, and the GitHub Action rebuilds them for
+# the website. data/raw/ IS committed: it's the OSM snapshot our edits refer to.
+output/
+data/processed/
+website/_site/
+website/.quarto/
+website/trail_map.html
+/.quarto/
+
+# Personal data, e.g. GPX of runs that start from someone's home
+data/private/
