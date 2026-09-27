@@ -151,7 +151,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item">
-    <a class="nav-link" href="./trail_map.html"> 
+    <a class="nav-link" href="./trail_map.html" target="_blank"> 
 <span class="menu-text">Full-screen map</span></a>
   </li>  
   <li class="nav-item compact">
@@ -203,11 +203,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Hover a line for its name. Click it for its tags and a link to it on OpenStreetMap.</li>
 <li>The buttons at the top left turn layers on and off, including what we removed from the network (red) and links we added (dotted black).</li>
 </ul>
-<p>On a phone, the <a href="trail_map.html">full-screen map</a> is easier to use.</p>
+<p>On a phone, the <a href="trail_map.html" target="_blank">full-screen map</a> is easier to use.</p>
 </section>
 <section id="routes" class="level2">
 <h2 class="anchored" data-anchor-id="routes">Routes</h2>
-<p>The <a href="./routes.html">Routes</a> page picks a loop (or out-and-back) from the Park Centre at the distance you choose: the same route of the day for everyone, or shuffle for another. Each comes with an elevation profile, written directions, a GPX file, an image for sharing, and palm-size cards to print for anyone running without a device. The <a href="./ultra.html">Ultra</a> page is one route over every trail in the park.</p>
+<p>The <a href="./routes.html">Routes</a> page picks a loop (or out-and-back) from the Park Centre at the distance you choose: the same route of the day for everyone, or shuffle for another. Each comes with an elevation profile, written directions, a GPX file, an image for sharing, and palm-size cards to print for anyone running without a device (or to save as a picture on your phone). The <a href="./ultra.html">Ultra</a> page is one route over every trail in the park.</p>
 <section id="how-routes-are-made-and-picked" class="level3">
 <h3 class="anchored" data-anchor-id="how-routes-are-made-and-picked">How routes are made and picked</h3>
 <p><strong>The routes are made ahead of time, not on your phone.</strong> Each time the site is built, a script (<code>07_generate_routes.py</code>) tries about 13,500 loops from the Park Centre: out to a random trail junction A, across to another, B, and back. Each leg takes the cheapest way, where a metre of street costs 3× a metre of trail, and ground already covered costs 8× more, so legs look for new trail. Those “random” junctions come from a fixed seed, so the same data always gives the same routes. Out-and-backs go to a trail junction at half the distance and back.</p>
@@ -262,7 +262,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>different settings give a different list to shuffle, and so a different route.</li>
 </ul>
 <p>Nothing is stored or sent anywhere: every phone does the same arithmetic. “1 of 42 matching routes” means 42 routes fit your settings, and you’re on the first in today’s order.</p>
-<p><strong>Sharing a route.</strong> <strong>Share</strong> opens your phone’s share sheet with the route’s name, distance, climb, written directions and a link. The link ends in <code>?route=</code> and a short code that fingerprints the route’s exact path, so it opens that same route (not the route of the day) for whoever you send it to. Where the phone allows, the GPX file goes along too. If the routes have been rebuilt since and that exact route is gone, the link falls back to the route of the day.</p>
+<p><strong>Sharing a route.</strong> <strong>Share</strong> opens your phone’s share sheet with the route’s name, distance, climb, written directions and a link. On a computer the button is <strong>Copy link</strong>: it copies the same text, ready to paste into an email or a message. The link ends in <code>?route=</code> and a short code that fingerprints the route’s exact path, so it opens that same route (not the route of the day) for whoever you send it to. Where the phone allows, the GPX file goes along too. If the routes have been rebuilt since and that exact route is gone, the link falls back to the route of the day.</p>
 </section>
 </section>
 <section id="our-edits" class="level2">
@@ -271,6 +271,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li>NW and SW Marine Drive are the park’s edge for us: beach and foreshore trails below them are left out, as are a few dead-end stubs, parking-lot spurs and school grounds.</li>
 <li>Where a trail crosses W 16th Avenue but OSM never joined the two sides (Cleveland Trail; Sword Fern to Douglas Fir), we add the missing link.</li>
+<li>Camosun Trails’ last stretch up to W 16th Ave counts as park trail, although it’s just outside the official park boundary.</li>
 <li>Every build checks that trails still connect across Chancellor Blvd, University Blvd and W 16th Ave.</li>
 </ul>
 </section>

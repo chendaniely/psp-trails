@@ -195,11 +195,8 @@
   border: 2px solid #0b0b0b;
   color: #0b0b0b;
 }
-.ultra-legend b.wc {
-  width: 20px;
-  height: 20px;
-  background: #eda100;
-  color: #0b0b0b;
+.ultra-legend img {
+  height: 22px;
 }
 .directions li.optional {
   font-style: italic;
