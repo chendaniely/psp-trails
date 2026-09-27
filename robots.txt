@@ -1,1 +1,1 @@
-Sitemap: https://chendaniely.github.io/psp-trails/sitemap.xml
+Sitemap: https://pstrunners.github.io/sitemap.xml
