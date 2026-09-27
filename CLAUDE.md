@@ -43,7 +43,7 @@ editing helpers never hits the public servers.
 | 02 | download OSM `highway=*` ways in park + 400 m, plus toilets/water | `data/raw/osm_highways.json` (raw Overpass, keeps node ids), `.gpkg`, `osm_amenities.geojson`, `study_area.geojson` |
 | 03 | NRCan 2 m lidar DTM sampled at every OSM node | `data/raw/node_elevation.csv` |
 | 04 | classify ways, apply `data/manual/` edits | `data/processed/ways.gpkg` |
-| 05 | MapLibre map (via the `maplibre` Python package) | `output/trail_map.html` |
+| 05 | MapLibre map (via the `maplibre` Python package), plus trail/street names for the Routes map | `output/trail_map.html`, `output/labels.geojson` |
 | 06 | connection checks across Chancellor, University, W 16th + required links | `output/connection_check.csv` |
 | 07 | route library from the Park Centre | `data/processed/routes.geojson` |
 
@@ -113,6 +113,10 @@ and `cost`. A route is a list of steps `(u, v, key)`.
   mulberry32 seeded by FNV-1a of today's date in America/Vancouver
   (Fisher–Yates); order[0] is the route of the day, "Another route" steps
   through the order. Documented on the About page; keep them in sync.
+- Route map labels: `labels.geojson` (named trails/streets, `key` =
+  `routing.trail_key` so "Salish" = "Salish Trail") draws faint trail lines
+  and italic/grey labels; the route's own stretches (≥300 m, from the cue
+  sheet) are named in bold at their midpoints and their faint labels hidden.
 - Share uses the Web Share API (GPX file only where `navigator.canShare`
   allows; Chrome/Android doesn't for .gpx), else copies text to the clipboard.
 - Printable cards: `LAYOUTS` (2–12 per letter page; 8 = palm size). Text

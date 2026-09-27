@@ -42,7 +42,7 @@ data/processed/ways.gpkg: 04_apply_manual_edits.py psp.py data/raw/osm_highways.
 	$(PY) $<
 
 # 05 · Interactive MapLibre map of the trails
-output/trail_map.html: 05_map_trails.py psp.py data/processed/ways.gpkg data/raw/osm_amenities.geojson
+output/trail_map.html output/labels.geojson: 05_map_trails.py psp.py routing.py data/processed/ways.gpkg data/raw/osm_amenities.geojson
 	$(PY) $<
 
 map: output/trail_map.html
@@ -73,10 +73,13 @@ website/trail_map.html: output/trail_map.html
 website/routes.geojson: data/processed/routes.geojson
 	cp $< $@
 
-website: website/trail_map.html website/routes.geojson
+website/labels.geojson: output/labels.geojson
+	cp $< $@
+
+website: website/trail_map.html website/routes.geojson website/labels.geojson
 	quarto render website
 
-preview: website/trail_map.html website/routes.geojson
+preview: website/trail_map.html website/routes.geojson website/labels.geojson
 	quarto preview website
 
 test:
@@ -87,7 +90,7 @@ lint:
 	uv run ruff check .
 
 clean:
-	rm -rf output data/processed website/_site website/.quarto website/trail_map.html website/routes.geojson
+	rm -rf output data/processed website/_site website/.quarto website/trail_map.html website/routes.geojson website/labels.geojson
 
 clean-data:
 	rm -rf data/raw data/cache

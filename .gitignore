@@ -30,6 +30,7 @@ data/processed/
 website/_site/
 website/trail_map.html
 website/routes.geojson
+website/labels.geojson
 
 # Personal data, never committed (e.g. GPX of runs that start from someone's home)
 data/private/

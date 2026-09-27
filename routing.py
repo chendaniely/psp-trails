@@ -246,14 +246,14 @@ UNNAMED = {
 }
 
 
-def _clean(name):
+def clean_name(name):
     """First part of a two-language name: "Camosun Bog | xʷməm̓qʷe:m Boardwalk"."""
     return name.split(" | ")[0].split(" - ")[0]
 
 
-def _trail(name):
+def trail_key(name):
     """OSM spells some trails both ways: "Salish" and "Salish Trail"."""
-    return _clean(name).removesuffix(" Trail")
+    return clean_name(name).removesuffix(" Trail")
 
 
 ABBREVIATIONS = {
@@ -283,9 +283,12 @@ def cue_sheet(H, steps, min_m=40):
             and kind in STREET_KINDS
             and metres < min_m
         )
-        label = f"Cross {_street(name)}" if crossing else _clean(name or UNNAMED[kind])
+        label = (
+            f"Cross {_street(name)}" if crossing else clean_name(name or UNNAMED[kind])
+        )
         if cues and (
-            _trail(cues[-1][0]) == _trail(label) or (metres < min_m and not crossing)
+            trail_key(cues[-1][0]) == trail_key(label)
+            or (metres < min_m and not crossing)
         ):
             cues[-1][1] += metres
         else:
@@ -302,7 +305,7 @@ def route_name(H, steps, n=3):
     by_trail = Counter()
     for name, kind, metres in route_pieces(H, steps):
         if name and kind in TRAIL_KINDS:
-            by_trail[_trail(name)] += metres  # insertion order = running order
+            by_trail[trail_key(name)] += metres  # insertion order = running order
     top = {trail for trail, _ in by_trail.most_common(n)}
     names = [trail for trail in by_trail if trail in top]
     if len(names) > 1:
@@ -376,7 +379,7 @@ def _label(pieces, within_m=60):
     run = 0
     for name, kind, metres in pieces:
         if name:
-            return _street(name) if kind in STREET_KINDS else _trail(name)
+            return _street(name) if kind in STREET_KINDS else trail_key(name)
         run += metres
         if run >= within_m:
             break

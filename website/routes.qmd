@@ -154,6 +154,8 @@ mapDiv = html`<div class="route-map"></div>`
 maplibregl = require("maplibre-gl@5.24.0/dist/maplibre-gl.js")
 
 START = [-123.22248, 49.25918] // Park Centre
+// Named trails and streets (step 05): context lines and labels.
+labels = FileAttachment("labels.geojson").json()
 EMPTY = ({type: "FeatureCollection", features: []})
 
 map = {
@@ -170,7 +172,14 @@ map = {
   await new Promise((resolve) => m.on("load", resolve));
   m.addSource("route", {type: "geojson", data: EMPTY});
   m.addSource("hover", {type: "geojson", data: EMPTY});
+  m.addSource("labels", {type: "geojson", data: labels});
+  m.addSource("route-names", {type: "geojson", data: EMPTY});
   const round = {"line-join": "round", "line-cap": "round"};
+  // Every named trail, faintly, so you can see what the route passes.
+  m.addLayer({id: "trails", type: "line", source: "labels",
+              filter: ["==", ["get", "kind"], "trail"], layout: round,
+              paint: {"line-color": "#6b8f71", "line-opacity": 0.8,
+                      "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.8, 16, 2]}});
   m.addLayer({id: "route-casing", type: "line", source: "route", layout: round,
               paint: {"line-color": "#fcfcfb", "line-width": 8}});
   m.addLayer({id: "route", type: "line", source: "route", layout: round,
@@ -182,6 +191,26 @@ map = {
                        "text-size": 22, "text-keep-upright": false,
                        "text-allow-overlap": true},
               paint: {"text-color": "#0b0b0b"}});
+  // Names along the lines, for everything the route doesn't use; the route's
+  // own trails are named on the route itself (next layer, filled in below).
+  const along = (size, font) => ({
+    "symbol-placement": "line", "text-field": ["get", "name"], "text-font": [font],
+    "text-size": size, "text-max-angle": 45, "symbol-spacing": 250
+  });
+  const halo = {"text-halo-color": "#fcfcfb", "text-halo-width": 1.5};
+  m.addLayer({id: "street-labels", type: "symbol", source: "labels", minzoom: 13,
+              filter: ["==", ["get", "kind"], "street"],
+              layout: along(10.5, "Noto Sans Regular"),
+              paint: {"text-color": "#52514e", ...halo}});
+  m.addLayer({id: "trail-labels", type: "symbol", source: "labels", minzoom: 12.5,
+              filter: ["==", ["get", "kind"], "trail"],
+              layout: along(11, "Noto Sans Italic"),
+              paint: {"text-color": "#3d6b47", ...halo}});
+  m.addLayer({id: "route-names", type: "symbol", source: "route-names",
+              layout: {"text-field": ["get", "name"], "text-font": ["Noto Sans Bold"],
+                       "text-size": 12, "text-variable-anchor": ["left", "right", "top", "bottom"],
+                       "text-radial-offset": 0.6},
+              paint: {"text-color": "#1c5cab", "text-halo-color": "#fcfcfb", "text-halo-width": 2}});
   // Where the pointer is on the elevation profile.
   m.addLayer({id: "hover", type: "circle", source: "hover",
               paint: {"circle-radius": 7, "circle-color": "#eb6834",
@@ -201,6 +230,30 @@ map = {
 // Draw the chosen route and zoom to it.
 {
   map.getSource("route").setData(route ?? EMPTY);
+  // Name the route's stretches on the route: a bold label halfway along each
+  // named stretch of 300 m or more, from the cue sheet.
+  const cues = route ? route.properties.cues : [];
+  const profile = route ? route.properties.profile : []; // [km, m, lon, lat] every 50 m
+  const nearest = (km) => profile.reduce((a, b) => (Math.abs(b[0] - km) < Math.abs(a[0] - km) ? b : a));
+  const unnamed = new Set(["unnamed trail", "crossing", "path", "sidewalk", "street"]);
+  const named = cues.filter(
+    ([label, , km]) => km >= 0.3 && !unnamed.has(label) && !label.startsWith("Cross ")
+  );
+  map.getSource("route-names").setData({
+    type: "FeatureCollection",
+    features: named
+      .map(([label, at, km]) => {
+        const [, , lon, lat] = nearest(at + km / 2);
+        return {type: "Feature", properties: {name: label},
+                geometry: {type: "Point", coordinates: [lon, lat]}};
+      })
+  });
+  // Trails named on the route drop their faint label; everything else keeps it
+  // (either spelling: "Salish Trail" = "Salish").
+  const keys = [...new Set(named.map(([label]) => label.replace(/ Trail$/, "")))];
+  const onRoute = ["in", ["get", "key"], ["literal", keys]];
+  map.setFilter("trail-labels", ["all", ["==", ["get", "kind"], "trail"], ["!", onRoute]]);
+  map.setFilter("street-labels", ["all", ["==", ["get", "kind"], "street"], ["!", onRoute]]);
   if (route) {
     const bounds = new maplibregl.LngLatBounds();
     route.geometry.coordinates.forEach((c) => bounds.extend(c));

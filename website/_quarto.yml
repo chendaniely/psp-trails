@@ -5,6 +5,7 @@ project:
   resources:
     - trail_map.html
     - routes.geojson
+    - labels.geojson
 
 website:
   title: "Pacific Spirit Trails"

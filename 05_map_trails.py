@@ -15,6 +15,8 @@
 # Inputs:  `data/raw/*` boundaries and amenities (01, 02),
 #          `data/processed/ways.gpkg` (04)
 # Output:  `output/trail_map.html` (self-contained; open it in a browser)
+#          `output/labels.geojson`: named trails and streets, for labelling
+#          the Routes page map
 
 # %%
 import json
@@ -35,6 +37,7 @@ from maplibre.controls import (
 from maplibre.sources import GeoJSONSource
 
 import psp
+import routing
 
 # %% Load
 park = gpd.read_file(psp.DATA_RAW / "park_boundary_metrovan.geojson")
@@ -421,3 +424,22 @@ out.write_text(
     m.to_html(title="Pacific Spirit trails", style="position:absolute; inset:0;")
 )
 print(f"Wrote {out} ({out.stat().st_size / 1e6:.1f} MB)")
+
+# %% Labels for the Routes page map: one line per named trail or street,
+# clipped to the study area and simplified (it's for labels, not routing).
+LABEL_KINDS = {"park trail": "trail", "other path": "trail", "street": "street"}
+named = ways[ways["name"].notna() & ways["kind"].isin(LABEL_KINDS)]
+named = named.assign(
+    kind=named["kind"].map(LABEL_KINDS),
+    # "Salish" and "Salish Trail" are the same trail: the page matches on this
+    key=named["name"].map(routing.trail_key),
+)
+labels = (
+    named.to_crs(psp.CRS_METRIC)
+    .dissolve(by=["name", "key", "kind"])
+    .reset_index()[["name", "key", "kind", "geometry"]]
+)
+labels["geometry"] = labels.line_merge().simplify(3)
+labels = labels.to_crs(psp.CRS_WGS84)
+labels.to_file(psp.OUTPUT / "labels.geojson", layer_options={"COORDINATE_PRECISION": 5})
+labels["kind"].value_counts()
