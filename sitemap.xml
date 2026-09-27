@@ -2,18 +2,30 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://pstrunners.github.io/about.html</loc>
-    <lastmod>2026-09-27T19:29:30.252Z</lastmod>
+    <lastmod>2026-09-27T20:05:46.665Z</lastmod>
   </url>
   <url>
-    <loc>https://pstrunners.github.io/ultra.html</loc>
-    <lastmod>2026-09-27T19:29:30.252Z</lastmod>
+    <loc>https://pstrunners.github.io/map.html</loc>
+    <lastmod>2026-09-27T20:05:46.665Z</lastmod>
   </url>
   <url>
     <loc>https://pstrunners.github.io/index.html</loc>
-    <lastmod>2026-09-27T19:29:30.252Z</lastmod>
+    <lastmod>2026-09-27T20:05:46.665Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pstrunners.github.io/rotd.html</loc>
+    <lastmod>2026-09-27T20:05:46.665Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pstrunners.github.io/bikes.html</loc>
+    <lastmod>2026-09-27T20:05:46.665Z</lastmod>
+  </url>
+  <url>
+    <loc>https://pstrunners.github.io/ultra.html</loc>
+    <lastmod>2026-09-27T20:05:46.665Z</lastmod>
   </url>
   <url>
     <loc>https://pstrunners.github.io/routes.html</loc>
-    <lastmod>2026-09-27T19:29:30.252Z</lastmod>
+    <lastmod>2026-09-27T20:05:46.665Z</lastmod>
   </url>
 </urlset>
