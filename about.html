@@ -26,6 +26,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -73,6 +108,8 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
+<script type="module" src="site_libs/quarto-ojs/quarto-ojs-runtime.js"></script>
+<link href="site_libs/quarto-ojs/quarto-ojs.css" rel="stylesheet">
 
 
 <link rel="stylesheet" href="styles.css">
@@ -102,6 +139,10 @@ ul.task-list li input[type="checkbox"] {
   <li class="nav-item">
     <a class="nav-link" href="./routes.html"> 
 <span class="menu-text">Routes</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./ultra.html"> 
+<span class="menu-text">Ultra</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link active" href="./about.html" aria-current="page"> 
@@ -166,13 +207,53 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="routes" class="level2">
 <h2 class="anchored" data-anchor-id="routes">Routes</h2>
-<p>The <a href="./routes.html">Routes</a> page picks a loop (or out-and-back) from the Park Centre at the distance you choose: the same route of the day for everyone, or shuffle for another. Each comes with an elevation profile, written directions, a GPX file, and palm-size cards to print for anyone running without a device.</p>
+<p>The <a href="./routes.html">Routes</a> page picks a loop (or out-and-back) from the Park Centre at the distance you choose: the same route of the day for everyone, or shuffle for another. Each comes with an elevation profile, written directions, a GPX file, an image for sharing, and palm-size cards to print for anyone running without a device. The <a href="./ultra.html">Ultra</a> page is one route over every trail in the park.</p>
 <section id="how-routes-are-made-and-picked" class="level3">
 <h3 class="anchored" data-anchor-id="how-routes-are-made-and-picked">How routes are made and picked</h3>
 <p><strong>The routes are made ahead of time, not on your phone.</strong> Each time the site is built, a script (<code>07_generate_routes.py</code>) tries about 13,500 loops from the Park Centre: out to a random trail junction A, across to another, B, and back. Each leg takes the cheapest way, where a metre of street costs 3× a metre of trail, and ground already covered costs 8× more, so legs look for new trail. Those “random” junctions come from a fixed seed, so the same data always gives the same routes. Out-and-backs go to a trail junction at half the distance and back.</p>
 <p><strong>Only good routes are kept:</strong> at least 80% trail, at most 10% street, and (for loops) at most 15% of the distance run twice.</p>
-<p><strong>Then near-copies are removed.</strong> Many good loops differ only in a short stretch, so we compare routes by the trail segments they use (a segment is the stretch between two junctions): the segments two routes share, divided by all the segments either one uses. The best routes go first (most trail, least doubling back, fewest streets), and each next route is kept only if it shares at most <strong>75%</strong> with every route already kept. So any two routes differ in at least a quarter of their trail, about 2 km on an 8 km loop. That leaves 226 routes, including about 100 loops of 7–10 km. Allowing more overlap would give more routes, but more of them would feel the same.</p>
+<p><strong>Then near-copies are removed.</strong> Many good loops differ only in a short stretch, so we compare routes by the trail segments they use (a segment is the stretch between two junctions): the segments two routes share, divided by all the segments either one uses. The best routes go first (most trail, least doubling back, fewest streets), and each next route is kept only if it shares at most <strong>75%</strong> with every route already kept. So any two routes differ in at least a quarter of their trail, about 2 km on an 8 km loop. Allowing more overlap would give more routes, but more of them would feel the same.</p>
 <p><strong>Route numbers are positions in that list.</strong> Loops are sorted shortest first and numbered L01, L02, … (L01 is the shortest loop); out-and-backs are OB01, OB02, …. When the data or our edits change and the site is rebuilt, the list can change, so a number isn’t a permanent name for a route.</p>
+<p><strong>The 7–10 km routes cover the park.</strong> Random turn points tend to miss trails close to the start and at the far north end, so after the library is built the script adds loops aimed at whatever trail no 7–10 km route runs yet, until no more good loops can be found:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code hidden" id="cb1" data-startfrom="75" data-source-offset="-0"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript" style="counter-reset: source-line 74;"><span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a>coverage <span class="op">=</span> <span class="fu">FileAttachment</span>(<span class="st">"coverage.json"</span>)<span class="op">.</span><span class="fu">json</span>()</span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a><span class="fu">md</span><span class="vs">`Run as a set, the **</span><span class="sc">${</span>coverage<span class="op">.</span><span class="at">band_routes</span><span class="sc">}</span><span class="vs"> routes of </span><span class="sc">${</span>coverage<span class="op">.</span><span class="at">band_km</span>[<span class="dv">0</span>]<span class="sc">}</span><span class="vs">–</span><span class="sc">${</span>coverage<span class="op">.</span><span class="at">band_km</span>[<span class="dv">1</span>]<span class="sc">}</span><span class="vs"> km**</span></span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a><span class="vs">(</span><span class="sc">${</span>coverage<span class="op">.</span><span class="at">added_for_coverage</span><span class="sc">}</span><span class="vs"> of them added for coverage) run</span></span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a><span class="vs">**</span><span class="sc">${</span>coverage<span class="op">.</span><span class="at">band_trail_km</span><span class="sc">}</span><span class="vs"> of the park's </span><span class="sc">${</span>coverage<span class="op">.</span><span class="at">park_trail_km</span><span class="sc">}</span><span class="vs"> km of trail**</span></span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a><span class="vs">(</span><span class="sc">${</span>(<span class="dv">100</span> <span class="op">*</span> coverage<span class="op">.</span><span class="at">band_trail_km</span> <span class="op">/</span> coverage<span class="op">.</span><span class="at">park_trail_km</span>)<span class="op">.</span><span class="fu">toFixed</span>(<span class="dv">1</span>)<span class="sc">}</span><span class="vs">%).`</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-1-1" data-nodetype="declaration">
+
+</div>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<div id="ojs-cell-1-2" data-nodetype="expression">
+
+</div>
+</div>
+</div>
+</div>
+<p>Just for fun, here’s what they miss. Each bit is too short, or too awkward to reach, for a good loop, but it’s only a few metres if you want to say you’ve run the lot. “Map” opens the trail map right there.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code hidden" id="cb2" data-startfrom="87" data-source-offset="0"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript" style="counter-reset: source-line 86;"><span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a><span class="fu">html</span><span class="vs">`&lt;table class="table table-sm"&gt;</span></span>
+<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a><span class="vs">  &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Trail&lt;/th&gt;&lt;th&gt;Length&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;th&gt;&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;</span></span>
+<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a><span class="vs">  &lt;tbody&gt;</span><span class="sc">${</span>coverage<span class="op">.</span><span class="at">uncovered</span><span class="op">.</span><span class="fu">map</span>((u) <span class="kw">=&gt;</span> <span class="fu">html</span><span class="vs">`&lt;tr&gt;</span></span>
+<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a><span class="vs">    &lt;td&gt;</span><span class="sc">${</span>u<span class="op">.</span><span class="at">trail</span><span class="sc">}</span><span class="vs">&lt;/td&gt;</span></span>
+<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="vs">    &lt;td&gt;</span><span class="sc">${</span>u<span class="op">.</span><span class="at">m</span><span class="sc">}</span><span class="vs"> m&lt;/td&gt;</span></span>
+<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a><span class="vs">    &lt;td&gt;</span><span class="sc">${</span>u<span class="op">.</span><span class="at">dead_end</span> <span class="op">?</span> <span class="st">"dead end"</span> <span class="op">:</span> <span class="st">""</span><span class="sc">}</span><span class="vs">&lt;/td&gt;</span></span>
+<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a><span class="vs">    &lt;td&gt;&lt;a href="trail_map.html#18/</span><span class="sc">${</span>u<span class="op">.</span><span class="at">lat</span><span class="sc">}</span><span class="vs">/</span><span class="sc">${</span>u<span class="op">.</span><span class="at">lon</span><span class="sc">}</span><span class="vs">" target="_blank"&gt;Map&lt;/a&gt;&lt;/td&gt;</span></span>
+<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a><span class="vs">  &lt;/tr&gt;`</span>)<span class="sc">}</span><span class="vs">&lt;/tbody&gt;</span></span>
+<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a><span class="vs">&lt;/table&gt;`</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div id="ojs-cell-2" data-nodetype="expression">
+
+</div>
+</div>
+</div>
+<p>The <a href="./ultra.html">Ultra</a> page covers everything, these bits included.</p>
 <p><strong>The route of the day is a shuffle seeded by the date.</strong> The page keeps the routes that match your choices (type and distance), then shuffles them using today’s date in Vancouver (e.g.&nbsp;<code>2026-09-27</code>) as the seed for its random numbers. The same seed always gives the same shuffle, so everyone who picks the same settings on the same day sees the same order:</p>
 <ul>
 <li>the first route in today’s order is the <strong>route of the day</strong>, and it’s what you get when the page loads or you refresh;</li>
@@ -233,6 +314,17 @@ ul.task-list li input[type="checkbox"] {
 </section>
 
 </main> <!-- /main -->
+<script type="ojs-module-contents">
+eyJjb250ZW50cyI6W3sibWV0aG9kTmFtZSI6ImludGVycHJldCIsImNlbGxOYW1lIjoib2pzLWNlbGwtMSIsImlubGluZSI6ZmFsc2UsInNvdXJjZSI6ImNvdmVyYWdlID0gRmlsZUF0dGFjaG1lbnQoXCJjb3ZlcmFnZS5qc29uXCIpLmpzb24oKVxubWRgUnVuIGFzIGEgc2V0LCB0aGUgKioke2NvdmVyYWdlLmJhbmRfcm91dGVzfSByb3V0ZXMgb2YgJHtjb3ZlcmFnZS5iYW5kX2ttWzBdfeKAkyR7Y292ZXJhZ2UuYmFuZF9rbVsxXX0ga20qKlxuKCR7Y292ZXJhZ2UuYWRkZWRfZm9yX2NvdmVyYWdlfSBvZiB0aGVtIGFkZGVkIGZvciBjb3ZlcmFnZSkgcnVuXG4qKiR7Y292ZXJhZ2UuYmFuZF90cmFpbF9rbX0gb2YgdGhlIHBhcmsncyAke2NvdmVyYWdlLnBhcmtfdHJhaWxfa219IGttIG9mIHRyYWlsKipcbigkeygxMDAgKiBjb3ZlcmFnZS5iYW5kX3RyYWlsX2ttIC8gY292ZXJhZ2UucGFya190cmFpbF9rbSkudG9GaXhlZCgxKX0lKS5gXG4ifSx7Im1ldGhvZE5hbWUiOiJpbnRlcnByZXQiLCJjZWxsTmFtZSI6Im9qcy1jZWxsLTIiLCJpbmxpbmUiOmZhbHNlLCJzb3VyY2UiOiJodG1sYDx0YWJsZSBjbGFzcz1cInRhYmxlIHRhYmxlLXNtXCI+XG4gIDx0aGVhZD48dHI+PHRoPlRyYWlsPC90aD48dGg+TGVuZ3RoPC90aD48dGg+PC90aD48dGg+PC90aD48L3RyPjwvdGhlYWQ+XG4gIDx0Ym9keT4ke2NvdmVyYWdlLnVuY292ZXJlZC5tYXAoKHUpID0+IGh0bWxgPHRyPlxuICAgIDx0ZD4ke3UudHJhaWx9PC90ZD5cbiAgICA8dGQ+JHt1Lm19IG08L3RkPlxuICAgIDx0ZD4ke3UuZGVhZF9lbmQgPyBcImRlYWQgZW5kXCIgOiBcIlwifTwvdGQ+XG4gICAgPHRkPjxhIGhyZWY9XCJ0cmFpbF9tYXAuaHRtbCMxOC8ke3UubGF0fS8ke3UubG9ufVwiIHRhcmdldD1cIl9ibGFua1wiPk1hcDwvYT48L3RkPlxuICA8L3RyPmApfTwvdGJvZHk+XG48L3RhYmxlPmBcbiJ9XX0=
+</script>
+<script type="module">
+if (window.location.protocol === "file:") { alert("The OJS runtime does not work with file:// URLs. Please use a web server to view this document."); }
+window._ojs.paths.runtimeToDoc = "../..";
+window._ojs.paths.runtimeToRoot = "../..";
+window._ojs.paths.docToRoot = "";
+window._ojs.selfContained = false;
+window._ojs.runtime.interpretFromScriptTags();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";

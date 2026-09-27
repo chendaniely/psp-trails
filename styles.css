@@ -156,3 +156,52 @@
   font-size: 0.9rem;
   margin-top: -0.5rem;
 }
+
+/* Ultra page */
+.ultra-map {
+  height: min(75vh, 700px);
+}
+.ultra-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0.4rem 0 0.75rem;
+  font-size: 0.9rem;
+  color: #52514e;
+}
+.ultra-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ultra-legend i {
+  display: inline-block;
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+}
+.ultra-legend i.dashed {
+  background: repeating-linear-gradient(90deg, #4a3aa7 0 4px, transparent 4px 8px);
+}
+.ultra-legend b {
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.7rem;
+  border-radius: 50%;
+}
+.ultra-legend b.km {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #0b0b0b;
+  color: #0b0b0b;
+}
+.ultra-legend b.wc {
+  width: 20px;
+  height: 20px;
+  background: #eda100;
+  color: #0b0b0b;
+}
+.directions li.optional {
+  font-style: italic;
+  color: #4a3aa7;
+}
