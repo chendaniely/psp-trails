@@ -1,0 +1,30 @@
+[
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "A map of the trails in Pacific Spirit Regional Park (Vancouver, BC) and the streets around it, built for a running group. It’s the first step towards generating routes: turning written directions into GPX and back, making loops or point-to-point runs of a given distance, and one day covering every trail in the park with as little backtracking as possible."
+  },
+  {
+    "objectID": "about.html#reading-the-map",
+    "href": "about.html#reading-the-map",
+    "title": "About",
+    "section": "Reading the map",
+    "text": "Reading the map\n\nPark trails are coloured by bike access, the same split as the official park map: ■ shared, ■ hiking only, ■ not tagged either way.\nGrey lines are streets, sidewalks and paths outside the park. We use them sparingly, only to link trails without doubling back.\n● WC marks toilets and ● W drinking water, useful when planning long runs and aid stations. They come from OpenStreetMap: check opening hours and seasonal closures before race day.\nHover a line for its name. Click it for its tags and a link to it on OpenStreetMap.\nThe buttons at the top left turn layers on and off, including what we removed from the network (red) and links we added (dotted black).\n\nOn a phone, the full-screen map is easier to use."
+  },
+  {
+    "objectID": "about.html#our-edits",
+    "href": "about.html#our-edits",
+    "title": "About",
+    "section": "Our edits",
+    "text": "Our edits\nOpenStreetMap has more than we run and misses a few links we use, so we keep a small set of edits:\n\nNW and SW Marine Drive are the park’s edge for us: beach and foreshore trails below them are left out, as are a few dead-end stubs, parking-lot spurs and school grounds.\nWhere a trail crosses W 16th Avenue but OSM never joined the two sides (Cleveland Trail; Sword Fern to Douglas Fir), we add the missing link.\nEvery build checks that trails still connect across Chancellor Blvd, University Blvd and W 16th Ave."
+  },
+  {
+    "objectID": "about.html#data",
+    "href": "about.html#data",
+    "title": "About",
+    "section": "Data",
+    "text": "Data\n\n\n\nData\nSource\nLicence\n\n\n\n\nTrails, streets, toilets, water\nOpenStreetMap\n© OpenStreetMap contributors, ODbL\n\n\nPark boundary\nMetro Vancouver open data\nOpen Government Licence – Metro Vancouver\n\n\nBasemap\nOpenFreeMap\n© OpenMapTiles, data © OpenStreetMap contributors\n\n\n\nIf a public trail is missing or wrong, the best fix is in OpenStreetMap itself, so every map and app gets it. The code is on GitHub.\nPlease stay on marked trails and follow the park’s rules on bikes and dogs."
+  }
+]

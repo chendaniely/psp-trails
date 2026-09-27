@@ -1,0 +1,11 @@
+/* Map page: the map fills the window below the navbar. Quarto pads direct
+   children of #quarto-content and gives iframes a bottom margin, so the
+   selector needs the id to win. */
+#quarto-content > .trail-map {
+  display: block;
+  width: 100%;
+  height: calc(100dvh - 62px);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
