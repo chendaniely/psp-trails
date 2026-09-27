@@ -6,6 +6,8 @@ project:
     - trail_map.html
     - routes.geojson
     - labels.geojson
+    - amenities.geojson
+    - amenities.js
     - ultra.json
     - coverage.json
 

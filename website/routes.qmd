@@ -156,6 +156,9 @@ maplibregl = require("maplibre-gl@5.24.0/dist/maplibre-gl.js")
 START = [-123.22248, 49.25918] // Park Centre
 // Named trails and streets (step 05): context lines and labels.
 labels = FileAttachment("labels.geojson").json()
+// Toilets and water (step 05), always on the map; drawn by amenities.js.
+amenitySites = FileAttachment("amenities.geojson").json()
+amenity = import(new URL("amenities.js", document.baseURI).href)
 EMPTY = ({type: "FeatureCollection", features: []})
 
 map = {
@@ -211,6 +214,7 @@ map = {
                        "text-size": 12, "text-variable-anchor": ["left", "right", "top", "bottom"],
                        "text-radial-offset": 0.6},
               paint: {"text-color": "#1c5cab", "text-halo-color": "#fcfcfb", "text-halo-width": 2}});
+  amenity.addToMap(m, maplibregl, amenitySites);
   // Where the pointer is on the elevation profile.
   m.addLayer({id: "hover", type: "circle", source: "hover",
               paint: {"circle-radius": 7, "circle-color": "#eb6834",
@@ -267,6 +271,8 @@ map = {
 profile = route
   ? route.properties.profile.map(([km, m, lon, lat]) => ({km, m, lon, lat}))
   : []
+// Toilets and water this route passes (not the ones at the start and finish).
+passed = route ? amenity.onProfile(route.properties.passes_by, profile) : []
 
 viewof here = {
   if (!route) return html``;
@@ -277,15 +283,17 @@ viewof here = {
     marginLeft: 44,
     style: {fontSize: "12px"},
     x: {label: "km →", domain: [0, route.properties.km]},
-    y: {label: "↑ elevation (m)", domain: [low, route.properties.high_m + 5], grid: true},
+    y: {label: "↑ elevation (m)", domain: [low, route.properties.high_m + (passed.length ? 20 : 5)], grid: true},
     marks: [
       Plot.areaY(profile, {x: "km", y1: low, y2: "m", fill: "#2a78d6", fillOpacity: 0.12}),
       Plot.lineY(profile, {x: "km", y: "m", stroke: "#2a78d6", strokeWidth: 2}),
+      ...amenity.profileMarks(Plot, passed),
       Plot.ruleX(profile, Plot.pointerX({x: "km", stroke: "#52514e"})),
       Plot.dot(profile, Plot.pointerX({x: "km", y: "m", fill: "#eb6834", r: 4})),
       Plot.tip(profile, Plot.pointerX({
         x: "km", y: "m",
-        title: (d) => `${d.km.toFixed(1)} km · ${Math.round(d.m)} m`
+        title: (d) => [`${d.km.toFixed(1)} km · ${Math.round(d.m)} m`,
+                       ...amenity.passedNear(route.properties.passes_by, d.km)].join(" · ")
       }))
     ]
   });

@@ -198,6 +198,12 @@
 .ultra-legend img {
   height: 22px;
 }
+.directions li.aid {
+  font-weight: 600;
+}
+.directions li.aid-optional {
+  color: #898781;
+}
 .directions li.optional {
   font-style: italic;
   color: #4a3aa7;

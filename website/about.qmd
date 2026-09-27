@@ -33,8 +33,10 @@ The [Routes](routes.qmd) page picks a loop (or out-and-back) from the Park
 Centre at the distance you choose: the same route of the day for everyone,
 or shuffle for another. Each comes with an elevation profile, written
 directions, a GPX file, an image for sharing, and palm-size cards to print
-for anyone running without a device (or to save as a picture on your phone). The [Ultra](ultra.qmd) page is one
-route over every trail in the park.
+for anyone running without a device (or to save as a picture on your phone).
+Toilets and water are always on the Routes map, and marked on the elevation
+profile where the route passes them (within 40 m). The [Ultra](ultra.qmd)
+page is one route over every trail in the park.
 
 ### How routes are made and picked
 

@@ -42,7 +42,7 @@ data/processed/ways.gpkg: 04_apply_manual_edits.py psp.py data/raw/osm_highways.
 	$(PY) $<
 
 # 05 · Interactive MapLibre map of the trails
-output/trail_map.html output/labels.geojson: 05_map_trails.py psp.py routing.py data/processed/ways.gpkg data/raw/osm_amenities.geojson
+output/trail_map.html output/labels.geojson output/amenities.geojson: 05_map_trails.py psp.py routing.py data/processed/ways.gpkg data/raw/osm_amenities.geojson
 	$(PY) $<
 
 map: output/trail_map.html
@@ -82,16 +82,19 @@ website/routes.geojson: data/processed/routes.geojson
 website/labels.geojson: output/labels.geojson
 	cp $< $@
 
+website/amenities.geojson: output/amenities.geojson
+	cp $< $@
+
 website/coverage.json: data/processed/coverage.json
 	cp $< $@
 
 website/ultra.json: data/processed/ultra.json
 	cp $< $@
 
-website: website/trail_map.html website/routes.geojson website/labels.geojson website/coverage.json website/ultra.json
+website: website/trail_map.html website/routes.geojson website/labels.geojson website/amenities.geojson website/coverage.json website/ultra.json
 	quarto render website
 
-preview: website/trail_map.html website/routes.geojson website/labels.geojson website/coverage.json website/ultra.json
+preview: website/trail_map.html website/routes.geojson website/labels.geojson website/amenities.geojson website/coverage.json website/ultra.json
 	quarto preview website
 
 test:
@@ -102,7 +105,7 @@ lint:
 	uv run ruff check .
 
 clean:
-	rm -rf output data/processed website/_site website/.quarto website/trail_map.html website/routes.geojson website/labels.geojson website/coverage.json website/ultra.json
+	rm -rf output data/processed website/_site website/.quarto website/trail_map.html website/routes.geojson website/labels.geojson website/amenities.geojson website/coverage.json website/ultra.json
 
 clean-data:
 	rm -rf data/raw data/cache

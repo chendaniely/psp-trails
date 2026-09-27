@@ -38,7 +38,22 @@ import psp
 import routing
 
 OFFSHOOT_M = 400  # dead-end branches up to this long are optional
-AID_RADIUS_M = 250  # passing this close to the Park Centre counts as an aid stop
+# Aid stations: name -> (lat, lon, what's there). The Park Centre is the start and
+# finish; the second breaks up the long middle, where the route comes by the
+# Imperial Trail trailhead.
+AID_STATIONS = {
+    "Park Centre": (
+        *psp.PARK_CENTRE_LAT_LON,
+        "Cleveland Trail at W 16th Ave (free parking along W 16th, toilets and water)",
+    ),
+    "King Edward": (
+        49.24938,
+        -123.20485,
+        "Imperial Trail trailhead at W King Edward Ave and W 29th Ave (street parking, toilets)",
+    ),
+}
+OPTIONAL_AID = {"King Edward"}  # takes a second car: don't count on it
+AID_RADIUS_M = 250  # passing this close to an aid station counts as a stop
 AMENITY_RADIUS_M = 40  # toilets / water this close to the route are "on the way"
 DETOUR_M = 100  # ... and this close, worth a short detour (at the closest pass)
 SITE_M = 25  # toilets and water this close together are one stop
@@ -114,53 +129,41 @@ def lon_lat_line(line_nodes, tolerance_m=2):
     return [[round(x, 5), round(y, 5)] for x, y in zip(lons, lats)]
 
 
-def passes(gap, within):
-    """Metres along the route of each separate pass within `within` metres of
-    something (`gap`: its distance from each route point), at the closest point."""
-    near = gap <= within
-    out, i = [], 0
-    while i < len(near):
-        if near[i]:
-            j = i
-            while j < len(near) and near[j]:
-                j += 1
-            out.append(float(along[i + np.argmin(gap[i:j])]))
-            i = j
-        else:
-            i += 1
-    return out
+# %% Aid station passes
+to_metric = pyproj.Transformer.from_crs(psp.CRS_WGS84, psp.CRS_METRIC, always_xy=True)
+aid_xy = {
+    name: np.array(to_metric.transform(lon, lat))
+    for name, (lat, lon, _) in AID_STATIONS.items()
+}
+aid_km = {
+    name: [
+        round(m / 1000, 1)
+        for m in routing.passes(np.hypot(*(xy - here).T), AID_RADIUS_M, along)
+    ]
+    for name, here in aid_xy.items()
+}
+aid_km
 
-
-# %% Aid station passes (near the Park Centre)
-centre = np.array([G.nodes[start]["x"], G.nodes[start]["y"]])
-aid_km = [round(m / 1000, 1) for m in passes(np.hypot(*(xy - centre).T), AID_RADIUS_M)]
-
-# %% Toilets and water: one site where they're within SITE_M of each other
+# %% Toilets and water: one site where they're within SITE_M of each other.
+# On the way: every pass within AMENITY_RADIUS_M, or a detour up to DETOUR_M.
 amenities = gpd.read_file(psp.DATA_RAW / "osm_amenities.geojson").to_crs(psp.CRS_METRIC)
-KIND = {"toilets": "toilets", "drinking_water": "water"}
 sites = []
-for point, amenity in zip(amenities.geometry, amenities["amenity"]):
-    site = next((s for s in sites if math.dist(s["xy"], (point.x, point.y)) <= SITE_M), None)  # fmt: skip
-    if site:
-        site["kinds"].add(KIND[amenity])
-    else:
-        sites.append({"xy": (point.x, point.y), "kinds": {KIND[amenity]}})
-
-# The ones on the way: every pass within AMENITY_RADIUS_M, or a detour up to DETOUR_M
-on_the_way = []  # (km, kind), away from the Park Centre
-for site in sites:
-    gap = np.hypot(xy[:, 0] - site["xy"][0], xy[:, 1] - site["xy"][1])
-    site["off_m"] = round(gap.min())
-    if site["off_m"] <= AMENITY_RADIUS_M:
-        site["km"] = [round(m / 1000, 1) for m in passes(gap, AMENITY_RADIUS_M)]
-    elif site["off_m"] <= DETOUR_M:
-        site["km"] = [round(along[np.argmin(gap)] / 1000, 1)]
-    else:
-        site["km"] = []
-    site["aid"] = math.dist(site["xy"], centre) <= AID_RADIUS_M
-    if not site["aid"]:
-        on_the_way += [(km, kind) for km in site["km"] for kind in site["kinds"]]
+on_the_way = []  # (km, "toilets" / "water"), away from the aid stations
+passes_by = []  # [km, "toilets" / "water" / "both", m off the route], for the profile
+for point, kind in zip(
+    *psp.amenity_sites(amenities, SITE_M)[["geometry", "kind"]].T.values
+):
+    here = (point.x, point.y)
+    km, off = routing.site_passes(here, xy, along, AMENITY_RADIUS_M, DETOUR_M)
+    aid = next(
+        (n for n, at in aid_xy.items() if math.dist(here, at) <= AID_RADIUS_M), None
+    )
+    sites.append({"xy": here, "kind": kind, "km": km, "off_m": off, "aid": aid})
+    if not aid:
+        on_the_way += [(k, w) for k in km for w in (["toilets", "water"] if kind == "both" else [kind])]  # fmt: skip
+        passes_by += [[k, kind, off] for k in km]
 on_the_way.sort()
+passes_by.sort()
 pd.DataFrame([s for s in sites if s["km"]])
 
 
@@ -176,7 +179,10 @@ def merge(stops, within_km=1.0):
     return [[a, b, sorted(kinds)] for a, b, kinds in merged]
 
 
-aid_stops = merge([(km, "aid") for km in aid_km], within_km=3.0)
+aid_stops = {
+    name: [[a, b] for a, b, _ in merge([(km, "aid") for km in kms], within_km=3.0)]
+    for name, kms in aid_km.items()
+}
 water_stops = merge(on_the_way)
 aid_stops, pd.DataFrame(water_stops, columns=["from km", "to km", "what"])
 
@@ -204,11 +210,20 @@ for km in range(MARKER_KM, int(along[-1] / 1000) + 1, MARKER_KM):
     points.append({"kind": "km", "label": str(km), "xy": (x, y)})
 for site in sites:
     if site["km"]:
-        kind = "both" if len(site["kinds"]) == 2 else next(iter(site["kinds"]))
-        where = "at the Park Centre" if site["aid"] else f"km {', '.join(map(str, site['km']))}"  # fmt: skip
+        where = f"at the {site['aid']} aid station" if site["aid"] else f"km {', '.join(map(str, site['km']))}"  # fmt: skip
         if site["off_m"] > AMENITY_RADIUS_M:
             where += f", {site['off_m']} m off the route"
-        points.append({"kind": kind, "label": where, "xy": site["xy"]})
+        points.append({"kind": site["kind"], "label": where, "xy": site["xy"]})
+for name, (_, _, what) in AID_STATIONS.items():
+    points.append(
+        {
+            "kind": "aid",
+            "name": name,
+            "label": what,
+            "optional": name in OPTIONAL_AID,
+            "xy": aid_xy[name],
+        }
+    )
 
 at, z, px, py = routing.elevation_profile(G, nodes)
 gain, loss = routing.climb(z)
@@ -227,6 +242,17 @@ landmarks = [
 directions = routing.directions(
     G, H, steps, landmarks=landmarks, stop_at_turnaround=False, optional=optional
 )
+for (
+    name,
+    stops,
+) in aid_stops.items():  # each pass by an aid station, bar start and finish
+    for a, _ in stops:
+        if 0 < a < round(length["full"] / 1000, 1):
+            if name in OPTIONAL_AID:
+                directions.append([a, f"Optional aid station: {name}, if there's a second car", f"(AID {name})"])  # fmt: skip
+            else:
+                directions.append([a, f"Aid station: {name}", f"AID {name}"])
+directions.sort(key=lambda d: d[0])
 len(directions)
 
 
@@ -235,7 +261,7 @@ def point_feature(p):
     lon, lat = to_lon_lat.transform(*p["xy"])
     return {
         "type": "Feature",
-        "properties": {"kind": p["kind"], "label": p["label"]},
+        "properties": {k: v for k, v in p.items() if k != "xy"},
         "geometry": {"type": "Point", "coordinates": [round(lon, 5), round(lat, 5)]},
     }
 
@@ -251,10 +277,10 @@ ultra = {
         "street_pct": round(100 * stats["street_share"]),
         "gain_m": round(gain),
         "loss_m": round(loss),
-        "aid": [
-            [a, b] for a, b, _ in aid_stops
-        ],  # [from km, to km] near the Park Centre
-        "on_the_way": water_stops,  # [from km, to km, ["toilets", "water"]], not at the Park Centre
+        "aid": aid_stops,  # {station: [[from km, to km], ...]}
+        "aid_optional": sorted(OPTIONAL_AID),  # stations that need a second car
+        "on_the_way": water_stops,  # [from km, to km, ["toilets", "water"]], not at aid stations
+        "passes_by": passes_by,  # [km, "toilets" / "water" / "both", m off the route]
     },
     "segments": {
         "type": "FeatureCollection",

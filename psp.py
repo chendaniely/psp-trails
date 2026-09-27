@@ -241,6 +241,36 @@ def bike_access(bicycle: pd.Series) -> pd.Series:
     return bike
 
 
+# Toilets and drinking water --------------------------------------------------------
+
+AMENITY_KIND = {"toilets": "toilets", "drinking_water": "water"}
+NOT_PUBLIC = {"private", "no", "customers"}
+
+
+def amenity_sites(
+    amenities: gpd.GeoDataFrame, within_m: float = 25
+) -> gpd.GeoDataFrame:
+    """Public toilets and drinking water (step 02), as sites: the ones within
+    `within_m` of each other are one. `kind` is toilets, water or both; the
+    point is the first one found (metric CRS)."""
+    access = amenities.get(
+        "access", pd.Series(None, index=amenities.index, dtype=object)
+    )
+    public = amenities[~access.isin(NOT_PUBLIC)].to_crs(CRS_METRIC)
+    sites = []  # [point, {kinds}]
+    for point, amenity in zip(public.geometry, public["amenity"]):
+        site = next((s for s in sites if s[0].distance(point) <= within_m), None)
+        if site:
+            site[1].add(AMENITY_KIND[amenity])
+        else:
+            sites.append([point, {AMENITY_KIND[amenity]}])
+    return gpd.GeoDataFrame(
+        {"kind": ["both" if len(k) == 2 else next(iter(k)) for _, k in sites]},
+        geometry=[p for p, _ in sites],
+        crs=CRS_METRIC,
+    )
+
+
 # Walkable network ---------------------------------------------------------------
 
 

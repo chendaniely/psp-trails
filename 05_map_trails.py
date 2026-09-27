@@ -17,6 +17,8 @@
 # Output:  `output/trail_map.html` (self-contained; open it in a browser)
 #          `output/labels.geojson`: named trails and streets, for labelling
 #          the Routes page map
+#          `output/amenities.geojson`: public toilets and water (one site
+#          where they're within 25 m), for the Routes page map
 
 # %%
 import json
@@ -443,3 +445,10 @@ labels["geometry"] = labels.line_merge().simplify(3)
 labels = labels.to_crs(psp.CRS_WGS84)
 labels.to_file(psp.OUTPUT / "labels.geojson", layer_options={"COORDINATE_PRECISION": 5})
 labels["kind"].value_counts()
+
+# %% Toilets and water for the Routes page map: kind toilets / water / both
+sites = psp.amenity_sites(amenities).to_crs(psp.CRS_WGS84)
+sites.to_file(
+    psp.OUTPUT / "amenities.geojson", layer_options={"COORDINATE_PRECISION": 5}
+)
+sites["kind"].value_counts()

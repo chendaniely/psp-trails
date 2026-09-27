@@ -38,6 +38,7 @@ jobs:
           uv run python 05_map_trails.py
           cp output/trail_map.html website/trail_map.html
           cp output/labels.geojson website/labels.geojson
+          cp output/amenities.geojson website/amenities.geojson
 
       - name: Check trail connections (step 06); stop if any fail
         run: |

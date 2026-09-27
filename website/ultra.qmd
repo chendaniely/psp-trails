@@ -14,6 +14,11 @@ W 16th Ave). It's also the aid station: park for free along W 16th Ave,
 right in the middle of the park, and there are toilets and drinking water.
 The route comes back past it along the way.
 
+An optional second aid station fits where Imperial Trail meets W King
+Edward Ave and W 29th Ave (the grey pin): there's street parking by the
+trailhead, and toilets. It takes a second car, so don't count on it, but it
+breaks up the long stretch between passes of the Park Centre.
+
 ```{ojs}
 //| echo: false
 ultra = FileAttachment("ultra.json").json()
@@ -23,6 +28,19 @@ stats = ultra.stats
 function kmRange([a, b]) {
   const [from, to] = [Math.round(a), Math.round(b)];
   return from === to ? `km ${from}` : `km ${from}–${to}`;
+}
+
+// "start, km 19–21, km 51, finish" for the Park Centre; just the km elsewhere.
+function aidPasses(name, stops) {
+  const kms = stops.map(kmRange);
+  return name === "Park Centre" ? ["start", ...kms.slice(1, -1), "finish"].join(", ") : kms.join(", ");
+}
+
+// Aid station passes (km), the sure ones or the optional ones.
+function aidKm(optional) {
+  return Object.entries(stats.aid)
+    .filter(([name]) => stats.aid_optional.includes(name) === optional)
+    .flatMap(([, stops]) => stops.map(([a]) => a));
 }
 
 function onTheWay(kind) {
@@ -38,10 +56,11 @@ html`<div class="route-card">
     ${stats.repeat_km} km run twice · ${stats.street_pct}% street
   </p>
   <p class="route-stats">
-    <strong>Aid station</strong> (Park Centre): start,
-    ${stats.aid.slice(1, -1).map(kmRange).join(", ")}, finish ·
+    <strong>Aid stations</strong>: ${Object.entries(stats.aid)
+      .map(([name, stops]) => `${stats.aid_optional.includes(name) ? "optional, if there's a second car: " : ""}${name} (${aidPasses(name, stops)})`)
+      .join("; ")} ·
     <strong>Toilets on the way</strong>: ${onTheWay("toilets").join(", ")} ·
-    <strong>Water</strong>: the aid station${water.length ? `, and near ${water.join(", ")}` : " only"}
+    <strong>Water</strong>: the Park Centre${water.length ? `, and near ${water.join(", ")}` : " only"}
   </p>
   <p class="route-id">Short dead-end offshoots are optional: without them it's
     ${stats.km_without_offshoots} km (they add ${stats.offshoot_km} km, out and back).</p>
@@ -60,7 +79,7 @@ html`<div class="ultra-legend">
   <span><i style="background:#eb6834"></i>run a second time</span>
   <span><i class="dashed"></i>optional offshoot</span>
   <span><b class="km">5</b>km marker</span>
-  ${Object.entries(AMENITY).map(([kind, text]) =>
+  ${Object.entries(amenity.AMENITY).map(([kind, text]) =>
     html`<span><img src=${ICONS[kind].toDataURL()} alt="">${text.toLowerCase()}</span>`)}
 </div>`
 ```
@@ -68,38 +87,9 @@ html`<div class="ultra-legend">
 ```{ojs}
 //| echo: false
 //| output: false
-// Toilets, water, or both: drawn once, for the map and the legend.
-AMENITY = ({toilets: "Toilets", water: "Water", both: "Toilets and water"})
-
-ICONS = {
-  // The same marks as the trail map: a yellow "WC" dot, a magenta "W" dot.
-  const R = 2, D = 22; // pixel ratio; one dot, in CSS px
-  function dot(ctx, cx, color, letters) {
-    ctx.beginPath();
-    ctx.arc(cx, D / 2, D / 2 - 1.5, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "#fcfcfb";
-    ctx.stroke();
-    ctx.fillStyle = "#0b0b0b";
-    ctx.font = "700 9px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(letters, cx, D / 2 + 0.5);
-  }
-  function icon(...dots) { // dots side by side
-    const width = D + (dots.length - 1) * 16;
-    const canvas = Object.assign(document.createElement("canvas"), {width: width * R, height: D * R});
-    canvas.style.width = `${width}px`;
-    const ctx = canvas.getContext("2d");
-    ctx.scale(R, R);
-    dots.forEach(([color, letters], i) => dot(ctx, D / 2 + i * 16, color, letters));
-    return canvas;
-  }
-  const toilets = ["#eda100", "WC"], water = ["#e87ba4", "W"];
-  return {toilets: icon(toilets), water: icon(water), both: icon(toilets, water)};
-}
+// Toilets, water, or both: drawn by amenities.js, the same as on the Routes page.
+amenity = import(new URL("amenities.js", document.baseURI).href)
+ICONS = amenity.icons()
 ```
 
 ```{ojs}
@@ -160,29 +150,23 @@ map = {
               layout: {"text-field": ["get", "label"], "text-font": ["Noto Sans Bold"],
                        "text-size": 11, "text-allow-overlap": true},
               paint: {"text-color": "#0b0b0b"}});
-  for (const [kind, canvas] of Object.entries(ICONS)) { // the style has its own "toilets"
-    const {width, height} = canvas;
-    m.addImage(`amenity-${kind}`, canvas.getContext("2d").getImageData(0, 0, width, height), {pixelRatio: 2});
-  }
-  m.addLayer({id: "amenities", type: "symbol", source: "points",
-              filter: ["in", ["get", "kind"], ["literal", Object.keys(AMENITY)]],
-              layout: {"icon-image": ["concat", "amenity-", ["get", "kind"]], "icon-allow-overlap": true}});
-  m.on("click", "amenities", (e) => {
-    const f = e.features[0];
-    new maplibregl.Popup()
-      .setLngLat(f.geometry.coordinates)
-      .setText(`${AMENITY[f.properties.kind]}: ${f.properties.label}`)
-      .addTo(m);
+  // Toilets and water on the way (with the km of each pass, in the popup)
+  amenity.addToMap(m, maplibregl, {
+    type: "FeatureCollection",
+    features: ultra.points.features.filter((f) => f.properties.kind in amenity.AMENITY)
   });
-  m.on("mouseenter", "amenities", () => (m.getCanvas().style.cursor = "pointer"));
-  m.on("mouseleave", "amenities", () => (m.getCanvas().style.cursor = ""));
   m.addLayer({id: "hover", type: "circle", source: "hover",
               paint: {"circle-radius": 7, "circle-color": "#eb6834",
                       "circle-stroke-color": "#fcfcfb", "circle-stroke-width": 2}});
-  new maplibregl.Marker({color: "#0b0b0b"})
-    .setLngLat(START)
-    .setPopup(new maplibregl.Popup().setText("Start, finish and aid station: Park Centre (toilets and water)"))
-    .addTo(m);
+  for (const f of ultra.points.features.filter((f) => f.properties.kind === "aid")) {
+    const main = f.properties.name === "Park Centre"; // also the start and finish
+    new maplibregl.Marker({color: main ? "#0b0b0b" : "#898781"})
+      .setLngLat(f.geometry.coordinates)
+      .setPopup(new maplibregl.Popup().setText(
+        `${main ? "Start, finish and aid station" : f.properties.optional
+          ? "Optional aid station, if there's a second car" : "Aid station"}: ${f.properties.name}, ${f.properties.label}`))
+      .addTo(m);
+  }
   const bounds = new maplibregl.LngLatBounds();
   ultra.full.forEach((c) => bounds.extend(c));
   m.fitBounds(bounds, {padding: 30, duration: 0});
@@ -195,6 +179,19 @@ map = {
 //| echo: false
 profile = ultra.profile.map(([km, m, lon, lat]) => ({km, m, lon, lat}))
 
+// Toilets and water on the way, as on the map (amenities.js).
+passed = amenity.onProfile(stats.passes_by, profile)
+
+// What's at this km, for the tooltip.
+function whatsHere(km) {
+  const near = (a, b = a) => a - 0.15 <= km && km <= b + 0.15;
+  const what = Object.entries(stats.aid)
+    .filter(([, stops]) => stops.some(([a, b]) => near(a, b)))
+    .map(([name]) => `${stats.aid_optional.includes(name) ? "optional aid station" : "aid station"} (${name})`);
+  what.push(...amenity.passedNear(stats.passes_by, km));
+  return what.length ? ` · ${what.join(", ")}` : "";
+}
+
 viewof here = {
   const low = Math.floor((d3.min(profile, (d) => d.m) - 5) / 10) * 10;
   return Plot.plot({
@@ -203,16 +200,19 @@ viewof here = {
     marginLeft: 44,
     style: {fontSize: "12px"},
     x: {label: "km →", domain: [0, stats.km]},
-    y: {label: "↑ elevation (m)", domain: [low, d3.max(profile, (d) => d.m) + 5], grid: true},
+    y: {label: "↑ elevation (m)", domain: [low, d3.max(profile, (d) => d.m) + 20], grid: true},
     marks: [
       Plot.areaY(profile, {x: "km", y1: low, y2: "m", fill: "#2a78d6", fillOpacity: 0.12}),
       Plot.lineY(profile, {x: "km", y: "m", stroke: "#2a78d6", strokeWidth: 1.5}),
       // Aid station passes
-      Plot.ruleX(stats.aid.map(([a]) => a), {stroke: "#0b0b0b", strokeDasharray: "3,3"}),
+      // Aid stations: the Park Centre bold; the optional one faint, as it may not be there
+      Plot.ruleX(aidKm(false), {stroke: "#0b0b0b", strokeWidth: 1.5, strokeDasharray: "5,3"}),
+      Plot.ruleX(aidKm(true), {stroke: "#898781", strokeOpacity: 0.5, strokeDasharray: "1,3"}),
+      ...amenity.profileMarks(Plot, passed),
       Plot.ruleX(profile, Plot.pointerX({x: "km", stroke: "#52514e"})),
       Plot.dot(profile, Plot.pointerX({x: "km", y: "m", fill: "#eb6834", r: 4})),
       Plot.tip(profile, Plot.pointerX({x: "km", y: "m",
-        title: (d) => `${d.km.toFixed(1)} km · ${Math.round(d.m)} m`}))
+        title: (d) => `${d.km.toFixed(1)} km · ${Math.round(d.m)} m${whatsHere(d.km)}`}))
     ]
   });
 }
@@ -228,7 +228,9 @@ map.getSource("hover").setData(
 )
 ```
 
-Dashed lines on the profile are the passes by the aid station.
+On the profile, the dashed lines are the passes by the Park Centre aid
+station (the faint dotted ones: the optional one at King Edward), and the WC
+and W dots the toilets and water on the way.
 
 ```{ojs}
 //| echo: false
@@ -267,7 +269,8 @@ html`<div class="route-actions">
 //| echo: false
 html`<details class="cue-details"><summary>All ${ultra.directions.length} turns</summary>
   <ol class="directions">${ultra.directions.map(([km, full]) =>
-    html`<li class=${full.startsWith("Optional") ? "optional" : ""}><span class="at-km">${km.toFixed(1)}</span> ${full}</li>`
+    html`<li class=${full.startsWith("Aid station") ? "aid" : full.startsWith("Optional aid") ? "aid-optional"
+                     : full.startsWith("Optional") ? "optional" : ""}><span class="at-km">${km.toFixed(1)}</span> ${full}</li>`
   )}</ol>
 </details>`
 ```

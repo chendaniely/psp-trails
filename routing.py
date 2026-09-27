@@ -597,6 +597,42 @@ def directions(
 # Covering every trail ------------------------------------------------------------
 
 
+def passes(gap, within, along):
+    """Metres along a route of each separate pass within `within` metres of
+    something. `gap` is its distance from each route point, `along` each
+    point's distance along the route; a pass is placed at its closest point."""
+    near = gap <= within
+    out, i = [], 0
+    while i < len(near):
+        if near[i]:
+            j = i
+            while j < len(near) and near[j]:
+                j += 1
+            out.append(float(along[i + np.argmin(gap[i:j])]))
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def site_passes(site, xy, along, near_m=40, detour_m=100):
+    """(km of each pass, metres off the route) for a site such as toilets.
+
+    Every pass within `near_m` counts; a site further off but within
+    `detour_m` is worth a short detour, at the closest pass only. `xy` are the
+    route's points (metric), `along` their distance along it (m).
+    """
+    gap = np.hypot(xy[:, 0] - site[0], xy[:, 1] - site[1])
+    off = float(gap.min())
+    if off <= near_m:
+        at = passes(gap, near_m, along)
+    elif off <= detour_m:
+        at = [float(along[np.argmin(gap)])]
+    else:
+        at = []
+    return [round(m / 1000, 1) for m in at], round(off)
+
+
 def offshoots(H, max_m=400):
     """Edge ids on short dead-end branches: offshoots you can only run out and back.
 

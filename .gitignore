@@ -31,6 +31,7 @@ website/_site/
 website/trail_map.html
 website/routes.geojson
 website/labels.geojson
+website/amenities.geojson
 website/coverage.json
 website/ultra.json
 

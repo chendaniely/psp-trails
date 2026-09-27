@@ -127,8 +127,11 @@ the way it came when another way on is free, and `_untangle` reverses a
 loop to remove a U-turn at a junction passed again; U-turns left are forced
 (dead ends). `routing.offshoots` peels dead ends to find short out-and-back
 branches (≤400 m), marked optional; `directions(..., stop_at_turnaround=False,
-optional=...)` keeps going past dead ends and flags them. Aid passes = within
-250 m of the Park Centre. Toilets and water within 25 m of each other are one
+optional=...)` keeps going past dead ends and flags them. Aid stations are
+`AID_STATIONS` in 08: the Park Centre and "King Edward" (Imperial Trail
+trailhead at W King Edward Ave & W 29th Ave: street parking, toilets; Dan's
+pick, it splits the long middle). A pass = within 250 m; each gets an "Aid
+station: …" line in the directions and a dashed line on the profile. Toilets and water within 25 m of each other are one
 site (toilets / water / both); on the way = every pass within 40 m, or the
 closest pass if 40–100 m off (labelled as a detour). ~62 km, 3 s to compute. A stray bit of "park trail"
 far from the rest can cost the ultra kilometres of detour: check the route and
@@ -144,6 +147,13 @@ remove such stubs in `data/manual/` (as with the SW/NW Marine Dr stub).
   `routing.trail_key` so "Salish" = "Salish Trail") draws faint trail lines
   and italic/grey labels; the route's own stretches (≥300 m, from the cue
   sheet) are named in bold at their midpoints and their faint labels hidden.
+- Toilets / water: `psp.amenity_sites` (public only, one site where within
+  25 m: toilets / water / both) → 05 writes `amenities.geojson` (always on
+  the Routes map); `routing.site_passes` gives each route's (07) and the
+  ultra's (08) `passes_by` [km, kind, m off] for the profile (07 skips the
+  first/last 250 m: every route starts at the Park Centre's). Both pages
+  draw them with the shared `website/amenities.js` (loaded with `import()`
+  from `document.baseURI`; it's in `_quarto.yml` resources).
 - "Image" draws a 1080×1350 PNG on a canvas (map snapshot via
   `map.once("render")` + `getCanvas()`, name, stats, elevation line, trail
   sequence, credits). "Card image" rasterises the fitted card preview:

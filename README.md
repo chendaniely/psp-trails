@@ -114,7 +114,9 @@ copies the same text. **Image** (for social media) and **Card image** (the
 printable card, to keep on a phone) go to the share sheet on phones and
 download elsewhere. See `website/routes.qmd` and the About page.
 It shows the map, elevation profile, directions, a cue sheet, a GPX download
-and printable cards (2 to 12 per page; 8 is palm size).
+and printable cards (2 to 12 per page; 8 is palm size). Toilets and water
+(05 writes `amenities.geojson`) are always on the map, and marked on the
+profile where the route passes them.
 If a route goes somewhere we wouldn't, that's usually a data fix in
 `data/manual/`.
 
@@ -130,7 +132,9 @@ are optional (`routing.offshoots`). A bit of road beats running a trail twice
 here (`REPEAT_PER_M`, `ULTRA_PER_M`; Imperial Dr and W 29th Ave count as
 trail), and the circuit only turns straight back at dead ends. Today:
 61.9 km, ↑700 m, 6.4 km run twice, 8% street. The map marks toilets, water, or both (within 25 m of each other) on
-the way: within 40 m of the route, or up to 100 m as a short detour. The idea comes from an existing Pacific Spirit Park ultra route,
+the way: within 40 m of the route, or up to 100 m as a short detour. A
+second aid station sits at the Imperial Trail trailhead by W King Edward Ave
+and W 29th Ave (street parking, toilets), splitting the long middle. The idea comes from an existing Pacific Spirit Park ultra route,
 credited on the Ultra page (link to come).
 
 ## Our edits (`data/manual/`)

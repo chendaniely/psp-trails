@@ -443,6 +443,17 @@ def test_untangle_runs_a_loop_the_other_way_instead_of_a_u_turn():
     assert all(a != b for a, b in itertools.pairwise(ids))  # no U-turns
 
 
+def test_site_passes_counts_each_pass_and_short_detours():
+    # 1 km east and back; toilets 10 m off at 300 m, water 70 m off at 600 m.
+    x = np.concatenate([np.arange(0, 1001, 10), np.arange(1000, -1, -10)])
+    xy = np.c_[x, np.zeros_like(x)]
+    along = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(xy, axis=0).T))])
+
+    assert routing.site_passes((300, 10), xy, along) == ([0.3, 1.7], 10)
+    assert routing.site_passes((600, 70), xy, along) == ([0.6], 70)  # detour: once
+    assert routing.site_passes((600, 300), xy, along) == ([], 300)
+
+
 def test_short_dead_end_offshoots_are_found():
     # A loop with a 100 m offshoot (optional) and an 800 m one (not "short").
     coords = {"a": (0, 0), "b": (100, 0), "c": (100, 100), "d": (0, 100),

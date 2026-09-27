@@ -31,6 +31,7 @@ import json
 
 import geopandas as gpd
 import networkx as nx
+import numpy as np
 import pandas as pd
 import pyproj
 from shapely import LineString
@@ -47,6 +48,7 @@ MAX_STREET = 0.10  # at most this share on streets and sidewalks
 MAX_REPEAT = 0.15  # loops: at most this share run twice
 MAX_OVERLAP = 0.75  # routes sharing more of their edges than this count as the same
 PROFILE_STEP_M = 50  # elevation profile resolution on the website
+START_FINISH_M = 250  # toilets / water passed this near the start or finish go unmarked
 
 # %% The network: OSM + our edits, main connected piece only
 raw = json.loads((psp.DATA_RAW / "osm_highways.json").read_text())
@@ -157,6 +159,8 @@ LANDMARK = {"toilets": "toilets", "drinking_water": "water fountain"}
 landmarks = [
     (p.x, p.y, LANDMARK[a]) for p, a in zip(amenities.geometry, amenities["amenity"])
 ]
+# ... and as sites (toilets / water / both) to mark on each route's profile
+sites = [((p.x, p.y), kind) for p, kind in zip(*psp.amenity_sites(amenities)[["geometry", "kind"]].T.values)]  # fmt: skip
 
 # %% One route in detail, to check the directions read well
 example = next(r for r in routes if 8000 <= r["length_m"] <= 9000)
@@ -180,6 +184,14 @@ for r in routes:
         [round(d / 1000, 2), round(h, 1), round(lo, 5), round(la, 5)]
         for d, h, lo, la in zip(at[every], z[every], p_lons, p_lats)
     ]
+    passes_by = []  # toilets and water on the way (not at the start or finish)
+    for site, kind in sites:
+        kms, off = routing.site_passes(site, np.c_[x, y], at)
+        passes_by += [
+            [km, kind, off]
+            for km in kms
+            if START_FINISH_M <= km * 1000 <= at[-1] - START_FINISH_M
+        ]
     features.append(
         {
             "type": "Feature",
@@ -200,6 +212,7 @@ for r in routes:
                 "low_m": round(float(z.min())),
                 "high_m": round(float(z.max())),
                 "profile": profile,  # [km, m, lon, lat]
+                "passes_by": sorted(passes_by),  # [km, toilets / water / both, m off]
                 "cues": routing.cue_sheet(H, r["steps"]),
                 "directions": routing.directions(G, H, r["steps"], landmarks=landmarks),
             },
