@@ -1,0 +1,279 @@
+---
+title: "Route of the day"
+subtitle: "From the Park Centre, Cleveland Trail at W 16th Ave"
+format:
+  html:
+    include-in-header:
+      text: |
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+---
+
+Pick a distance and a route type. Everyone who opens this page on the same
+day, with the same choices, gets the same route of the day; **Another route**
+shuffles. Routes stay on park trails as much as possible and use streets only
+to link trails up. [Routes](routes.qmd) lists them all.
+
+```{ojs}
+//| echo: false
+//| output: false
+// The route picker's settings (_route-picker.qmd).
+PICKER = ({file: "routes.geojson", km: [4, 12], defaultKm: [7, 10], share: true,
+           list: "routes.html"})
+```
+
+{{< include _common.qmd >}}
+
+{{< include _route-helpers.qmd >}}
+
+{{< include _route-picker.qmd >}}
+
+### Printable card
+
+For runners who'd rather leave the phone at home: the route's outline and
+every turn with the km it comes at. Pick a card size, print, and cut along
+the dashed lines. The preview is the real printed size; the text shrinks
+until the whole route fits.
+
+```{ojs}
+//| echo: false
+// Card sizes: a US Letter page (8.5 × 11 in, 0.3 in margins) cut into a grid.
+// `font` is where the text size starts; it shrinks until the route fits.
+LAYOUTS = [
+  {n: 2, cols: 1, rows: 2, font: 13, size: "7.9 × 5.2 in"},
+  {n: 4, cols: 2, rows: 2, font: 10, size: "3.9 × 5.2 in"},
+  {n: 8, cols: 2, rows: 4, font: 8, size: "3.9 × 2.6 in, palm size"},
+  {n: 10, cols: 2, rows: 5, font: 8, size: "3.9 × 2.1 in, business card"},
+  {n: 12, cols: 3, rows: 4, font: 8, size: "2.6 × 2.6 in, sticky note"}
+].map((l) => ({...l, w: 7.9 / l.cols, h: 10.4 / l.rows, compact: l.n >= 8}))
+
+// Buttons, not a dropdown: always visible, and no oversized native menu.
+viewof layout = Inputs.radio(LAYOUTS, {
+  label: "Cards per page",
+  format: (l) => String(l.n),
+  value: LAYOUTS[2]
+})
+
+html`<p class="layout-size">Each card ${layout.size}</p>`
+
+route
+  ? html`<div class="route-actions">
+      ${Inputs.button("Print cards", {reduce: () => printCards(route, layout)})}
+      ${cardImageButton(route)}
+    </div>`
+  : html``
+```
+
+```{ojs}
+//| echo: false
+// A card, as HTML text, so the same markup serves the preview and the print page.
+function esc(text) {
+  return String(text).replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
+}
+
+function cardHtml(f, layout) {
+  const p = f.properties;
+  const steps = p.directions
+    .map(([at, , short]) => `<li><b>${at.toFixed(1)}</b> ${esc(short)}</li>`)
+    .join("");
+  const stats = `${p.km.toFixed(1)} km ${esc(p.type)} · ↑${p.gain_m} ↓${p.loss_m} m`;
+  if (layout.compact) {
+    // Directions get the full height; outline, start and legend sit at the side.
+    const columns = layout.n === 10 ? 3 : 2; // short, wide cards: three columns
+    return `<div class="pc pc-compact">
+      <div class="pc-head"><span class="pc-name">${esc(p.name)}</span><span class="pc-stats">${stats}</span></div>
+      <ol class="pc-steps" style="columns: ${columns}">${steps}</ol>
+      <div class="pc-side">${outline(f, 58)}
+        <div>○ Park Centre</div>
+        <div class="pc-legend">←→ turn<br>↖↗ slight<br>T T-junction<br>Y fork<br>↑ straight<br>WC toilets</div>
+        <div>${esc(p.id)}</div>
+      </div>
+    </div>`;
+  }
+  return `<div class="pc">
+    <div class="pc-head">
+      <div class="pc-name">${esc(p.name)}</div>
+      <div class="pc-stats">${stats} · ${p.trail_pct}% trail</div>
+    </div>
+    <div class="pc-body">
+      <div class="pc-side">${outline(f, 110)}<div class="pc-start">○ Park Centre<br>Cleveland &amp; W 16th</div></div>
+      <ol class="pc-steps">${steps}</ol>
+    </div>
+    <div class="pc-foot">
+      <span>← → turn · ↖↗ slight · ↙↘ sharp · T T-junction · Y fork · ↑ straight · WC toilets</span>
+      <span>${esc(p.id)} · pstrunners.github.io</span>
+    </div>
+  </div>`;
+}
+
+CARD_CSS = `
+.pc { box-sizing: border-box; border: 1px dashed #898781; padding: 0.1in 0.12in;
+      font: 9pt/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; color: #0b0b0b;
+      display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+.pc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+           border-bottom: 1px solid #0b0b0b; padding-bottom: 3px; margin-bottom: 4px; }
+.pc-name { font-weight: 700; font-size: 1.15em; }
+.pc-stats { white-space: nowrap; }
+.pc-body { display: flex; gap: 8px; flex: 1; min-height: 0; }
+.pc-side { flex: 0 0 auto; font-size: 0.8em; color: #52514e; }
+.pc-steps { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 0.8em;
+            flex: 1; min-height: 0; overflow: hidden; }
+.pc-steps li { break-inside: avoid; padding: 0.5px 0; }
+.pc-steps b { display: inline-block; min-width: 2.1em; font-variant-numeric: tabular-nums; }
+.pc-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px;
+           font-size: 0.72em; color: #52514e; border-top: 1px solid #c3c2b7;
+           padding-top: 2px; margin-top: 3px; }
+.pc-foot span:last-child { white-space: nowrap; }
+.pc-compact { padding: 0.07in 0.09in; display: grid; grid-template-columns: 1fr auto;
+              grid-template-rows: auto 1fr; column-gap: 0.6em; }
+.pc-compact .pc-head { grid-column: 1; flex-wrap: wrap; gap: 0 0.6em; margin-bottom: 3px; }
+.pc-compact .pc-name { font-size: 1.05em; }
+.pc-compact .pc-steps { grid-column: 1; grid-row: 2; }
+.pc-compact .pc-side { grid-column: 2; grid-row: 1 / 3; width: 0.62in; display: flex;
+                       flex-direction: column; gap: 3px; font-size: 0.8em; color: #52514e; }
+.pc-compact .pc-outline { width: 0.62in; height: 0.62in; }
+.pc-compact .pc-legend { line-height: 1.25; }
+`
+
+// Shrink the text until the directions fit on the card (no hidden overflow).
+function fitCards(root, start) {
+  const cards = [...root.querySelectorAll(".pc")];
+  const card = cards[0], steps = card.querySelector(".pc-steps");
+  const over = () =>
+    card.scrollHeight > card.clientHeight + 1 ||
+    steps.scrollHeight > steps.clientHeight + 1 ||
+    steps.scrollWidth > steps.clientWidth + 1;
+  let size = start;
+  const apply = () => cards.forEach((c) => (c.style.fontSize = `${size}pt`));
+  apply();
+  while (over() && size > 5) {
+    size -= 0.25;
+    apply();
+  }
+  return size;
+}
+
+function printCards(f, layout) {
+  const page = `<!doctype html><html><head><meta charset="utf-8">
+    <title>PSP ${esc(f.properties.id)} cards</title>
+    <style>${CARD_CSS}
+      @page { size: letter; margin: 0.3in; }
+      body { margin: 0; }
+      .sheet { display: grid; width: 7.9in;
+               grid-template-columns: repeat(${layout.cols}, ${layout.w}in);
+               grid-template-rows: repeat(${layout.rows}, ${layout.h}in); }
+    </style></head>
+    <body><div class="sheet">${cardHtml(f, layout).repeat(layout.n)}</div>
+    <script>${fitCards.toString()}
+      window.onload = () => { fitCards(document, ${layout.font}); window.print(); };
+    <\/script></body></html>`;
+  const w = window.open("", "_blank");
+  w.document.write(page);
+  w.document.close();
+}
+
+// The card as a picture, to keep on the phone: the preview, each word drawn
+// where the browser put it, at 4x (about 380 dpi). No dashed cut line.
+async function cardImage(card) {
+  const k = 4, box = card.getBoundingClientRect();
+  const canvas = Object.assign(document.createElement("canvas"),
+    {width: Math.round(box.width * k), height: Math.round(box.height * k)});
+  const ctx = canvas.getContext("2d");
+  ctx.scale(k, k);
+  ctx.translate(-box.left, -box.top);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(box.left, box.top, box.width, box.height);
+  for (const el of card.querySelectorAll("*")) { // the rules under the name and over the key
+    const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+    for (const side of ["Top", "Bottom"]) {
+      const w = parseFloat(cs[`border${side}Width`]);
+      if (!w || cs[`border${side}Style`] === "none") continue;
+      ctx.fillStyle = cs[`border${side}Color`];
+      ctx.fillRect(r.left, side === "Top" ? r.top : r.bottom - w, r.width, w);
+    }
+  }
+  for (const svg of card.querySelectorAll("svg")) { // the outline, drawn at full size
+    const r = svg.getBoundingClientRect(), img = new Image(), copy = svg.cloneNode(true);
+    copy.setAttribute("width", r.width * k);
+    copy.setAttribute("height", r.height * k);
+    copy.style.fontFamily = getComputedStyle(svg).fontFamily; // an image doesn't inherit it
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(copy))}`;
+    });
+    ctx.drawImage(img, r.left, r.top, r.width, r.height);
+  }
+  const words = document.createTreeWalker(card, NodeFilter.SHOW_TEXT), range = document.createRange();
+  ctx.textBaseline = "middle";
+  for (let node; (node = words.nextNode()); ) {
+    if (node.parentElement.closest("svg")) continue;
+    const cs = getComputedStyle(node.parentElement);
+    ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    ctx.fillStyle = cs.color;
+    for (const m of node.data.matchAll(/\S+/g)) {
+      range.setStart(node, m.index);
+      range.setEnd(node, m.index + m[0].length);
+      const r = range.getBoundingClientRect();
+      if (r.width && r.bottom <= box.bottom && r.right <= box.right) {
+        ctx.fillText(m[0], r.left, (r.top + r.bottom) / 2);
+      }
+    }
+  }
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+}
+
+function cardImageButton(f) {
+  const button = html`<button class="btn btn-quarto" type="button"
+    title="The card as a picture, to keep on your phone">Card image</button>`;
+  button.onclick = async () => {
+    const card = cardPreview.querySelector(".pc");
+    saveImage(await cardImage(card), `psp-${f.properties.id}-card.png`, f.properties.name);
+  };
+  return button;
+}
+
+cardPreview = {
+  if (!route) return html``;
+  const box = html`<div class="card-preview"><style>${CARD_CSS}</style></div>`;
+  box.insertAdjacentHTML("beforeend", cardHtml(route, layout));
+  const card = box.querySelector(".pc");
+  card.style.width = `${layout.w}in`;
+  card.style.height = `${layout.h}in`;
+  yield box; // on the page, so the browser can measure it
+  fitCards(box, layout.font);
+}
+```
+
+### Directions
+
+```{ojs}
+//| echo: false
+route
+  ? html`<ol class="directions">${route.properties.directions.map(
+      ([km, full]) => html`<li><span class="at-km">${km.toFixed(1)}</span> ${full}</li>`
+    )}</ol>`
+  : html``
+```
+
+### Cue sheet
+
+Every stretch of the route, as mapped: more literal than the directions.
+
+```{ojs}
+//| echo: false
+route
+  ? html`<details class="cue-details"><summary>Show every stretch</summary>
+      <table class="table table-sm cue-sheet">
+        <thead><tr><th>At km</th><th>Follow</th><th>For km</th></tr></thead>
+        <tbody>${route.properties.cues.map(([label, at, len]) =>
+          html`<tr><td>${at.toFixed(2)}</td><td>${label}</td><td>${len.toFixed(2)}</td></tr>`
+        )}</tbody>
+      </table>
+    </details>`
+  : html``
+```
+
+Routes are generated from OpenStreetMap data and our own
+[edits](https://github.com/pstrunners/pstrunners.github.io/tree/main/data/manual);
+elevation is NRCan lidar. Check trail closures and park rules before you go,
+and stay on marked trails.

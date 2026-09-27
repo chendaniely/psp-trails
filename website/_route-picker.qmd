@@ -1,0 +1,434 @@
+<!-- The route picker, map, elevation profile, GPX, share and image, for the
+ROTD and Bikes pages. Needs _common.qmd and _route-helpers.qmd, and a PICKER
+cell on the page: ({file, km: [min, max], defaultKm: [low, high], share,
+list: link to this library on the Routes page}) -->
+
+```{ojs}
+//| echo: false
+// A route opened from a link (?route=<key>, from a share or the Routes list)
+// shows until you change a setting; the controls start out including it.
+sharedKey = new URLSearchParams(location.search).get("route")
+fromList = new URLSearchParams(location.search).get("from") === "list"
+sharedRoute = routes.features.find((f) => f.properties.key === sharedKey) ?? null
+DEFAULT_TYPES = sharedRoute?.properties.type === "out-and-back" ? ["Out-and-back"] : ["Loop"]
+DEFAULT_KM = sharedRoute
+  ? [Math.min(PICKER.defaultKm[0], Math.floor(sharedRoute.properties.km)),
+     Math.max(PICKER.defaultKm[1], Math.ceil(sharedRoute.properties.km))]
+  : PICKER.defaultKm
+
+viewof types = Inputs.checkbox(["Loop", "Out-and-back"], {
+  label: "Route type",
+  value: DEFAULT_TYPES
+})
+viewof km = rangeSlider({min: PICKER.km[0], max: PICKER.km[1], step: 0.5, value: DEFAULT_KM, label: "Distance"})
+viewof again = Inputs.button("Another route")
+```
+
+```{ojs}
+//| echo: false
+routes = d3.json(PICKER.file) // FileAttachment only takes a literal name
+
+matching = routes.features.filter(
+  (f) =>
+    types.map((t) => t.toLowerCase()).includes(f.properties.type) &&
+    f.properties.km >= km[0] &&
+    f.properties.km <= km[1]
+)
+
+// Today in Vancouver, as YYYY-MM-DD: the seed for the route of the day.
+today = new Date().toLocaleDateString("en-CA", {timeZone: "America/Vancouver"})
+
+// FNV-1a string hash: turns the date into a number, the same on every phone.
+function hash(text) {
+  let h = 2166136261;
+  for (const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return h >>> 0;
+}
+
+// mulberry32: random numbers from a seed. Same seed, same sequence, anywhere.
+function seeded(seed) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Today's order for the matching routes: a Fisher-Yates shuffle seeded by the
+// date. Everyone gets the same order; "Another route" steps along it, so no
+// route repeats until you've seen them all.
+order = {
+  const random = seeded(hash(today));
+  const idx = matching.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  return idx;
+}
+
+useShared =
+  sharedRoute !== null &&
+  again === 0 &&
+  types.join() === DEFAULT_TYPES.join() &&
+  km.join() === DEFAULT_KM.join()
+
+position = matching.length ? again % matching.length : 0
+
+route = useShared
+  ? sharedRoute
+  : matching.length
+    ? matching[order[position]]
+    : null
+```
+
+```{ojs}
+//| echo: false
+route
+  ? html`<div class="route-card">
+      <h3>${route.properties.name}</h3>
+      <p class="route-stats">
+        <strong>${route.properties.km.toFixed(1)} km</strong> ${route.properties.type} ·
+        <strong>↑ ${route.properties.gain_m} m ↓ ${route.properties.loss_m} m</strong> ·
+        ${route.properties.trail_pct}% trail · ${route.properties.street_pct}% street
+        <span class="route-id">· route ${route.properties.id} ·
+        ${useShared
+          ? html`${fromList ? "from the route list" : "shared with you"} ·
+                 <a href=${PICKER.list}>all routes</a>`
+          : `${again === 0 ? "route of the day" : "another route"}: ${position + 1} of ${matching.length} matching routes`}</span>
+      </p>
+      ${sharedKey && !sharedRoute
+        ? html`<p class="route-note">The shared route isn't in the current list
+            (routes are rebuilt when the trail data changes), so here's today's route.</p>`
+        : ""}
+    </div>`
+  : html`<p><em>No routes match. Widen the distance or tick another route type.</em></p>`
+```
+
+```{ojs}
+//| echo: false
+mapDiv = html`<div class="route-map"></div>`
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+map = {
+  const m = new maplibregl.Map({
+    container: mapDiv,
+    style: "https://tiles.openfreemap.org/styles/positron",
+    center: START,
+    zoom: 13.5,
+    attributionControl: {
+      customAttribution: "Trails © OpenStreetMap contributors (ODbL)"
+    }
+  });
+  m.addControl(new maplibregl.NavigationControl(), "top-right");
+  await new Promise((resolve) => m.on("load", resolve));
+  m.addSource("route", {type: "geojson", data: EMPTY});
+  m.addSource("hover", {type: "geojson", data: EMPTY});
+  m.addSource("labels", {type: "geojson", data: labels});
+  m.addSource("route-names", {type: "geojson", data: EMPTY});
+  const round = {"line-join": "round", "line-cap": "round"};
+  // Every named trail, faintly, so you can see what the route passes.
+  m.addLayer({id: "trails", type: "line", source: "labels",
+              filter: ["==", ["get", "kind"], "trail"], layout: round,
+              paint: {"line-color": "#6b8f71", "line-opacity": 0.8,
+                      "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.8, 16, 2]}});
+  m.addLayer({id: "route-casing", type: "line", source: "route", layout: round,
+              paint: {"line-color": "#fcfcfb", "line-width": 8}});
+  m.addLayer({id: "route", type: "line", source: "route", layout: round,
+              paint: {"line-color": "#2a78d6", "line-width": 4}});
+  // Arrows along the line show which way to run.
+  m.addLayer({id: "route-arrows", type: "symbol", source: "route",
+              layout: {"symbol-placement": "line", "symbol-spacing": 80,
+                       "text-field": "›", "text-font": ["Noto Sans Bold"],
+                       "text-size": 22, "text-keep-upright": false,
+                       "text-allow-overlap": true},
+              paint: {"text-color": "#0b0b0b"}});
+  // Names along the lines, for everything the route doesn't use; the route's
+  // own trails are named on the route itself (next layer, filled in below).
+  const along = (size, font) => ({
+    "symbol-placement": "line", "text-field": ["get", "name"], "text-font": [font],
+    "text-size": size, "text-max-angle": 45, "symbol-spacing": 250
+  });
+  const halo = {"text-halo-color": "#fcfcfb", "text-halo-width": 1.5};
+  m.addLayer({id: "street-labels", type: "symbol", source: "labels", minzoom: 13,
+              filter: ["==", ["get", "kind"], "street"],
+              layout: along(10.5, "Noto Sans Regular"),
+              paint: {"text-color": "#52514e", ...halo}});
+  m.addLayer({id: "trail-labels", type: "symbol", source: "labels", minzoom: 12.5,
+              filter: ["==", ["get", "kind"], "trail"],
+              layout: along(11, "Noto Sans Italic"),
+              paint: {"text-color": "#3d6b47", ...halo}});
+  m.addLayer({id: "route-names", type: "symbol", source: "route-names",
+              layout: {"text-field": ["get", "name"], "text-font": ["Noto Sans Bold"],
+                       "text-size": 12, "text-variable-anchor": ["left", "right", "top", "bottom"],
+                       "text-radial-offset": 0.6},
+              paint: {"text-color": "#1c5cab", "text-halo-color": "#fcfcfb", "text-halo-width": 2}});
+  amenity.addToMap(m, maplibregl, amenitySites);
+  // Where the pointer is on the elevation profile.
+  m.addLayer({id: "hover", type: "circle", source: "hover",
+              paint: {"circle-radius": 7, "circle-color": "#eb6834",
+                      "circle-stroke-color": "#fcfcfb", "circle-stroke-width": 2}});
+  new maplibregl.Marker({color: "#0b0b0b"})
+    .setLngLat(START)
+    .setPopup(new maplibregl.Popup().setText("Start and finish: Park Centre"))
+    .addTo(m);
+  invalidation.then(() => m.remove());
+  return m;
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+// Draw the chosen route and zoom to it.
+{
+  map.getSource("route").setData(route ?? EMPTY);
+  // Name the route's stretches on the route: a bold label halfway along each
+  // named stretch of 300 m or more, from the cue sheet.
+  const cues = route ? route.properties.cues : [];
+  const profile = route ? route.properties.profile : []; // [km, m, lon, lat] every 50 m
+  const nearest = (km) => profile.reduce((a, b) => (Math.abs(b[0] - km) < Math.abs(a[0] - km) ? b : a));
+  const unnamed = new Set(["unnamed trail", "crossing", "path", "sidewalk", "street"]);
+  const named = cues.filter(
+    ([label, , km]) => km >= 0.3 && !unnamed.has(label) && !label.startsWith("Cross ")
+  );
+  map.getSource("route-names").setData({
+    type: "FeatureCollection",
+    features: named
+      .map(([label, at, km]) => {
+        const [, , lon, lat] = nearest(at + km / 2);
+        return {type: "Feature", properties: {name: label},
+                geometry: {type: "Point", coordinates: [lon, lat]}};
+      })
+  });
+  // Trails named on the route drop their faint label; everything else keeps it
+  // (either spelling: "Salish Trail" = "Salish").
+  const keys = [...new Set(named.map(([label]) => label.replace(/ Trail$/, "")))];
+  const onRoute = ["in", ["get", "key"], ["literal", keys]];
+  map.setFilter("trail-labels", ["all", ["==", ["get", "kind"], "trail"], ["!", onRoute]]);
+  map.setFilter("street-labels", ["all", ["==", ["get", "kind"], "street"], ["!", onRoute]]);
+  if (route) {
+    const bounds = new maplibregl.LngLatBounds();
+    route.geometry.coordinates.forEach((c) => bounds.extend(c));
+    map.fitBounds(bounds, {padding: 40, duration: 500});
+  }
+}
+```
+
+```{ojs}
+//| echo: false
+profile = route
+  ? route.properties.profile.map(([km, m, lon, lat]) => ({km, m, lon, lat}))
+  : []
+// Toilets and water this route passes (not the ones at the start and finish).
+passed = route ? amenity.onProfile(route.properties.passes_by, profile) : []
+
+viewof here = {
+  if (!route) return html``;
+  const low = Math.floor((route.properties.low_m - 5) / 10) * 10;
+  return Plot.plot({
+    width, // the page column, same as the map
+    height: 170,
+    marginLeft: 44,
+    style: {fontSize: "12px"},
+    x: {label: "km →", domain: [0, route.properties.km]},
+    y: {label: "↑ elevation (m)", domain: [low, route.properties.high_m + (passed.length ? 20 : 5)], grid: true},
+    marks: [
+      Plot.areaY(profile, {x: "km", y1: low, y2: "m", fill: "#2a78d6", fillOpacity: 0.12}),
+      Plot.lineY(profile, {x: "km", y: "m", stroke: "#2a78d6", strokeWidth: 2}),
+      ...amenity.profileMarks(Plot, passed),
+      Plot.ruleX(profile, Plot.pointerX({x: "km", stroke: "#52514e"})),
+      Plot.dot(profile, Plot.pointerX({x: "km", y: "m", fill: "#eb6834", r: 4})),
+      Plot.tip(profile, Plot.pointerX({
+        x: "km", y: "m",
+        title: (d) => [`${d.km.toFixed(1)} km · ${Math.round(d.m)} m`,
+                       ...amenity.passedNear(route.properties.passes_by, d.km)].join(" · ")
+      }))
+    ]
+  });
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+// Mirror the profile's pointer on the map.
+map.getSource("hover").setData(
+  here?.lon
+    ? {type: "Feature", geometry: {type: "Point", coordinates: [here.lon, here.lat]}}
+    : EMPTY
+)
+```
+
+```{ojs}
+//| echo: false
+function gpx(f) {
+  const points = f.geometry.coordinates
+    .map(([lon, lat]) => `<trkpt lat="${lat}" lon="${lon}"></trkpt>`)
+    .join("\n      ");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="psp-trails" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>PSP ${f.properties.id}: ${f.properties.name} (${f.properties.km} km)</name>
+    <trkseg>
+      ${points}
+    </trkseg>
+  </trk>
+</gpx>`;
+}
+
+// Phones and tablets get the share sheet. Desktop browsers either have none
+// or refuse (Chrome on a Mac: "Permission denied"), so there we copy or download.
+touch = matchMedia("(pointer: coarse)").matches
+
+async function shareSheet(data) {
+  if (!touch || !navigator.canShare?.(data)) return "unavailable";
+  try {
+    await navigator.share(data);
+    return "shared";
+  } catch (e) {
+    return e.name === "AbortError" ? "cancelled" : "failed";
+  }
+}
+
+// Save an image: to the share sheet (Photos, Strava, ...) or as a download.
+async function saveImage(blob, name, title) {
+  const result = await shareSheet({files: [new File([blob], name, {type: "image/png"})], title});
+  if (result === "shared" || result === "cancelled") return;
+  const a = Object.assign(document.createElement("a"), {href: URL.createObjectURL(blob), download: name});
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// Share: the phone's share sheet (messages, WhatsApp, email, Strava, ...).
+// The text has a link that opens this exact route; the GPX goes along where
+// the phone allows files. Otherwise the text goes to the clipboard.
+async function shareRoute(f) {
+  const p = f.properties;
+  const link = `${location.origin}${location.pathname}?route=${p.key}`;
+  const text = [
+    `${p.name}: ${p.km.toFixed(1)} km ${p.type}, ↑${p.gain_m} m ↓${p.loss_m} m,`,
+    "from the Park Centre (Cleveland Trail & W 16th Ave)",
+    link,
+    "",
+    ...p.directions.map(([at, full]) => `${at.toFixed(1)} km  ${full}`)
+  ].join("\n");
+  const title = `Pacific Spirit run: ${p.name}`;
+  const file = new File([gpx(f)], `psp-${p.id}.gpx`, {type: "application/gpx+xml"});
+  let result = await shareSheet({title, text, files: [file]});
+  if (result === "unavailable") result = await shareSheet({title, text});
+  if (result === "shared" || result === "cancelled") return result;
+  await navigator.clipboard.writeText(text);
+  return "copied";
+}
+
+function shareButton(f) {
+  const label = touch ? "Share" : "Copy link";
+  const button = html`<button class="btn btn-quarto" type="button"
+    title="The route's link, stats and directions, to paste into a message">${label}</button>`;
+  button.onclick = async () => {
+    const note = {copied: "Copied ✓", failed: "Couldn't copy"}[
+      await shareRoute(f).catch(() => "failed")
+    ];
+    if (note) {
+      button.textContent = note;
+      setTimeout(() => (button.textContent = label), 2000);
+    }
+  };
+  return button;
+}
+
+// Image: the route as a picture for Strava, Instagram or the group chat.
+// 1080 x 1350 (4:5 portrait): the map as shown, name, stats, elevation, the
+// trails in order, and credits.
+async function routeImage(f) {
+  const p = f.properties;
+  const W = 1080, H = 1350, pad = 48;
+  const font = (weight, size) => `${weight} ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  const canvas = Object.assign(document.createElement("canvas"), {width: W, height: H});
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fcfcfb";
+  ctx.fillRect(0, 0, W, H);
+
+  // The map, read straight after it draws (cover-fit into the top of the image).
+  const snapshot = await new Promise((resolve) => {
+    map.once("render", () => resolve(map.getCanvas().toDataURL("image/png")));
+    map.triggerRepaint();
+  });
+  const img = new Image();
+  await new Promise((resolve) => { img.onload = resolve; img.src = snapshot; });
+  const mapH = 760, scale = Math.max(W / img.width, mapH / img.height);
+  const [sw, sh] = [W / scale, mapH / scale];
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, W, mapH);
+
+  // Name (shrunk to fit), stats and start.
+  let y = mapH + 70, size = 52;
+  ctx.fillStyle = "#0b0b0b";
+  do { ctx.font = font(700, size); size -= 2; } while (ctx.measureText(p.name).width > W - 2 * pad);
+  ctx.fillText(p.name, pad, y);
+  ctx.font = font(600, 32);
+  ctx.fillText(`${p.km.toFixed(1)} km ${p.type} · ↑${p.gain_m} m ↓${p.loss_m} m · ${p.trail_pct}% trail`, pad, y += 52);
+  ctx.fillStyle = "#52514e";
+  ctx.font = font(400, 24);
+  ctx.fillText("Start/finish: Park Centre, Cleveland Trail & W 16th Ave · Pacific Spirit Regional Park", pad, y += 40);
+
+  // Elevation line.
+  const prof = p.profile, top = y + 24, h = 90;
+  const [lo, hi] = [d3.min(prof, (d) => d[1]), d3.max(prof, (d) => d[1])];
+  const px = (km) => pad + (km / p.km) * (W - 2 * pad);
+  const py = (m) => top + h - ((m - lo) / Math.max(hi - lo, 1)) * h;
+  ctx.beginPath();
+  prof.forEach(([km, m], i) => (i ? ctx.lineTo(px(km), py(m)) : ctx.moveTo(px(km), py(m))));
+  ctx.lineTo(px(p.km), top + h); ctx.lineTo(px(0), top + h); ctx.closePath();
+  ctx.fillStyle = "rgba(42, 120, 214, 0.15)"; ctx.fill();
+  ctx.beginPath();
+  prof.forEach(([km, m], i) => (i ? ctx.lineTo(px(km), py(m)) : ctx.moveTo(px(km), py(m))));
+  ctx.strokeStyle = "#2a78d6"; ctx.lineWidth = 3; ctx.stroke();
+
+  // The trails, in running order.
+  const unnamed = new Set(["unnamed trail", "crossing", "path", "sidewalk", "street"]);
+  const trails = p.cues.map(([label]) => label.replace(/ Trail$/, ""))
+    .filter((t, i, all) => !unnamed.has(t) && !t.startsWith("Cross ") && t !== all[i - 1]);
+  ctx.fillStyle = "#0b0b0b";
+  ctx.font = font(500, 26);
+  let line = "", ty = top + h + 56;
+  for (const word of trails.join(" › ").split(" ")) {
+    if (ctx.measureText(`${line} ${word}`).width > W - 2 * pad && line) {
+      ctx.fillText(line, pad, ty); ty += 36; line = word;
+    } else line = line ? `${line} ${word}` : word;
+    if (ty > H - 90) break;
+  }
+  if (ty <= H - 90) ctx.fillText(line, pad, ty);
+
+  // Footer.
+  ctx.fillStyle = "#52514e";
+  ctx.font = font(400, 20);
+  ctx.fillText(`pstrunners.github.io · route ${p.id}`, pad, H - 32);
+  ctx.textAlign = "right";
+  ctx.fillText("Map © OpenStreetMap contributors · OpenFreeMap", W - pad, H - 32);
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+}
+
+function imageButton(f) {
+  const button = html`<button class="btn btn-quarto" type="button">Image</button>`;
+  button.onclick = async () =>
+    saveImage(await routeImage(f), `psp-${f.properties.id}.png`, f.properties.name);
+  return button;
+}
+
+route
+  ? html`<div class="route-actions">
+      ${DOM.download(
+        () => new Blob([gpx(route)], {type: "application/gpx+xml"}),
+        `psp-${route.properties.id}.gpx`,
+        "Download GPX"
+      )}
+      ${PICKER.share ? shareButton(route) : ""}
+      ${imageButton(route)}
+    </div>`
+  : html``
+```

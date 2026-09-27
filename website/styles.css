@@ -208,3 +208,44 @@
   font-style: italic;
   color: #4a3aa7;
 }
+
+/* Routes page: a card per route */
+.route-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 0.6rem;
+  margin: 0.5rem 0 1.5rem;
+}
+.route-item {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #e3e2dc;
+  border-radius: 8px;
+  background: #fff;
+  color: #0b0b0b;
+  text-decoration: none;
+}
+.route-item:hover,
+.route-item:focus-visible {
+  border-color: #2a78d6;
+  box-shadow: 0 1px 4px rgba(42, 120, 214, 0.2);
+}
+.route-thumb {
+  flex: 0 0 64px;
+  height: 64px;
+}
+.route-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.route-item-name {
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+.route-item-stats {
+  color: #52514e;
+  font-size: 0.85rem;
+}

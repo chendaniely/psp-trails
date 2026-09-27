@@ -58,6 +58,12 @@ jobs:
           uv run python 08_plan_ultra.py
           cp data/processed/ultra.json website/
 
+      - name: The same for bikes (steps 07 and 08, MODE=bike)
+        run: |
+          MODE=bike uv run python 07_generate_routes.py
+          MODE=bike uv run python 08_plan_ultra.py
+          cp data/processed/bike_routes.geojson data/processed/bike_ultra.json website/
+
       - uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Render and publish to gh-pages

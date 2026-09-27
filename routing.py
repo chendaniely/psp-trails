@@ -25,6 +25,8 @@ COST_PER_M = {
     "sidewalk": 2.5,
     "street": 3.0,
 }
+# Bikes: the same, but on a sidewalk you walk the bike (crossing a street).
+BIKE_COST_PER_M = COST_PER_M | {"sidewalk": 6.0}
 TRAIL_KINDS = {"park trail", "connector"}
 STREET_KINDS = {"street", "sidewalk"}
 REPEAT_PENALTY = 8  # later legs of a loop avoid ground already covered
@@ -33,14 +35,15 @@ REPEAT_PENALTY = 8  # later legs of a loop avoid ground already covered
 # Contracting the graph -------------------------------------------------------
 
 
-def contract(G: nx.Graph, keep=()) -> nx.MultiGraph:
+def contract(G: nx.Graph, keep=(), cost_per_m=COST_PER_M) -> nx.MultiGraph:
     """Merge chains of two-neighbour nodes into single edges.
 
     Nodes in `keep` (e.g. the start of our runs) always stay, even mid-chain.
 
-    Each edge keeps: `length` and `cost` (m), `nodes` (the original node ids
-    in order from its lower-numbered end), and `pieces`: [name, kind, m] runs
-    in the same order, for cue sheets.
+    Each edge keeps: `length` and `cost` (m, weighted by `cost_per_m` for its
+    kinds of way), `nodes` (the original node ids in order from its
+    lower-numbered end), and `pieces`: [name, kind, m] runs in the same
+    order, for cue sheets.
     """
     keep = {n for n in G if G.degree(n) != 2} | set(keep)
     # A loop made only of two-neighbour nodes has no junction: keep one node.
@@ -75,7 +78,7 @@ def contract(G: nx.Graph, keep=()) -> nx.MultiGraph:
                 nodes=chain,
                 pieces=pieces,
                 length=sum(p[2] for p in pieces),
-                cost=sum(p[2] * COST_PER_M[p[1]] for p in pieces),
+                cost=sum(p[2] * cost_per_m[p[1]] for p in pieces),
             )
     return H
 
@@ -173,27 +176,42 @@ def _bearing(H, a, b):
     )
 
 
-def make_loops(H, start, min_m, max_m, tries=2000, seed=42):
-    """Loops start -> A -> B -> start, each leg avoiding ground already run."""
+def make_loops(H, start, min_m, max_m, tries=2000, seed=42, turns=2):
+    """Loops start -> A -> B -> start, each leg avoiding ground already run.
+
+    With `turns` > 2 (long rides in a small park), the loop goes round that
+    many turn points instead, in order of their bearing from the start.
+    """
     rng = random.Random(seed)
     reach = _waypoints(H, start)
     routes = []
     for _ in range(tries):
         target = rng.uniform(min_m, max_m)
-        leg = target / rng.uniform(2.6, 3.6)  # roughly a triangle
-        near = [n for n, m in reach.items() if 0.6 * leg <= m <= 1.4 * leg]
-        if len(near) < 2:
-            continue
-        a = rng.choice(near)
-        turn = [
-            n for n in near
-            if 0.8 <= abs(math.remainder(_bearing(H, start, n) - _bearing(H, start, a), math.tau)) <= 2.4
-        ]  # fmt: skip
-        if not turn:
-            continue
-        b = rng.choice(turn)
+        if turns == 2:
+            leg = target / rng.uniform(2.6, 3.6)  # roughly a triangle
+            near = [n for n, m in reach.items() if 0.6 * leg <= m <= 1.4 * leg]
+            if len(near) < 2:
+                continue
+            a = rng.choice(near)
+            turn = [
+                n for n in near
+                if 0.8 <= abs(math.remainder(_bearing(H, start, n) - _bearing(H, start, a), math.tau)) <= 2.4
+            ]  # fmt: skip
+            if not turn:
+                continue
+            points = [a, rng.choice(turn)]
+        else:
+            leg = target / rng.uniform(turns + 0.5, turns + 1.5)
+            near = [n for n, m in reach.items() if 0.4 * leg <= m <= 1.6 * leg]
+            if len(near) < turns:
+                continue
+            points = sorted(
+                rng.sample(near, turns), key=lambda n: _bearing(H, start, n)
+            )
+            if rng.random() < 0.5:
+                points.reverse()  # clockwise or anticlockwise
         steps, used = [], set()
-        for x, y in ((start, a), (a, b), (b, start)):
+        for x, y in pairwise([start, *points, start]):
             leg_steps = cheapest_path(H, x, y, used)
             steps += leg_steps
             used |= {edge_id(*s) for s in leg_steps}

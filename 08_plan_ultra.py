@@ -12,6 +12,10 @@
 # Short dead-end offshoots (<= OFFSHOOT_M, run out and back) are optional:
 # they're on the map and in the directions, and there's a GPX without them.
 #
+# MODE=bike (`MODE=bike uv run python 08_plan_ultra.py`) plans the same for
+# bikes: every trail but the hiking-only ones, no written directions, saved
+# as `bike_ultra.json`.
+#
 # The idea of running every Pacific Spirit trail as one ultra isn't ours:
 # there's an existing Pacific Spirit Park ultra route, credited on the Ultra
 # page. This is our version, computed from the trail data.
@@ -25,6 +29,7 @@
 import collections
 import json
 import math
+import os
 from itertools import pairwise
 
 import geopandas as gpd
@@ -37,6 +42,8 @@ from shapely import LineString
 import psp
 import routing
 
+MODE = os.environ.get("MODE", "run")  # or "bike"
+BIKE = MODE == "bike"
 OFFSHOOT_M = 400  # dead-end branches up to this long are optional
 # Aid stations: name -> (lat, lon, what's there). The Park Centre is the start and
 # finish; the second breaks up the long middle, where the route comes by the
@@ -63,6 +70,8 @@ MARKER_KM = 5  # km markers on the map
 # already: a bit of road beats running a trail a second time.
 REPEAT_PER_M = 2.5  # a trail stretch run a second time
 ULTRA_PER_M = {"park trail": 1, "connector": 1, "other path": 1.2, "sidewalk": 1.5, "street": 1.5}  # fmt: skip
+if BIKE:
+    ULTRA_PER_M["sidewalk"] = 4  # walking the bike (across a street)
 OUR_ROADS = {
     "Imperial Drive",
     "West 29th Avenue",
@@ -71,11 +80,14 @@ OUR_ROADS = {
 # %% The network: OSM + our edits, main connected piece, with elevations
 raw = json.loads((psp.DATA_RAW / "osm_highways.json").read_text())
 ways = gpd.read_file(psp.DATA_PROCESSED / "ways.gpkg")
+if BIKE:
+    ways = psp.bike_ways(ways)  # no hiking-only trails
 elevation = pd.read_csv(psp.DATA_RAW / "node_elevation.csv", index_col="node")
 G = psp.walk_graph(raw, ways, elevation["elevation_m"])
 G = G.subgraph(max(nx.connected_components(G), key=len)).copy()
 start = psp.nearest_node(G, *psp.PARK_CENTRE_LAT_LON)
-H = routing.contract(G, keep=[start])
+cost = routing.BIKE_COST_PER_M if BIKE else routing.COST_PER_M
+H = routing.contract(G, keep=[start], cost_per_m=cost)
 
 
 # %% Every junction-to-junction stretch that's mostly park trail must be run
@@ -242,10 +254,7 @@ landmarks = [
 directions = routing.directions(
     G, H, steps, landmarks=landmarks, stop_at_turnaround=False, optional=optional
 )
-for (
-    name,
-    stops,
-) in aid_stops.items():  # each pass by an aid station, bar start and finish
+for name, stops in aid_stops.items():  # each aid pass, bar start and finish
     for a, _ in stops:
         if 0 < a < round(length["full"] / 1000, 1):
             if name in OPTIONAL_AID:
@@ -253,6 +262,8 @@ for (
             else:
                 directions.append([a, f"Aid station: {name}", f"AID {name}"])
 directions.sort(key=lambda d: d[0])
+if BIKE:
+    directions = []  # bikes: map, profile and GPX, no written directions
 len(directions)
 
 
@@ -306,7 +317,7 @@ ultra = {
     "directions": directions,
 }
 psp.DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
-out = psp.DATA_PROCESSED / "ultra.json"
+out = psp.DATA_PROCESSED / f"{'bike_' if BIKE else ''}ultra.json"
 out.write_text(json.dumps(ultra))
 print(
     f"Saved {out.name}: {ultra['stats']['km']} km, ↑{ultra['stats']['gain_m']} m, "

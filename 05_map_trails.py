@@ -16,9 +16,9 @@
 #          `data/processed/ways.gpkg` (04)
 # Output:  `output/trail_map.html` (self-contained; open it in a browser)
 #          `output/labels.geojson`: named trails and streets, for labelling
-#          the Routes page map
+#          the route page maps
 #          `output/amenities.geojson`: public toilets and water (one site
-#          where they're within 25 m), for the Routes page map
+#          where they're within 25 m), for the route page maps
 
 # %%
 import json
@@ -427,7 +427,7 @@ out.write_text(
 )
 print(f"Wrote {out} ({out.stat().st_size / 1e6:.1f} MB)")
 
-# %% Labels for the Routes page map: one line per named trail or street,
+# %% Labels for the route page maps: one line per named trail or street,
 # clipped to the study area and simplified (it's for labels, not routing).
 LABEL_KINDS = {"park trail": "trail", "other path": "trail", "street": "street"}
 named = ways[ways["name"].notna() & ways["kind"].isin(LABEL_KINDS)]
@@ -446,7 +446,7 @@ labels = labels.to_crs(psp.CRS_WGS84)
 labels.to_file(psp.OUTPUT / "labels.geojson", layer_options={"COORDINATE_PRECISION": 5})
 labels["kind"].value_counts()
 
-# %% Toilets and water for the Routes page map: kind toilets / water / both
+# %% Toilets and water for the route page maps: kind toilets / water / both
 sites = psp.amenity_sites(amenities).to_crs(psp.CRS_WGS84)
 sites.to_file(
     psp.OUTPUT / "amenities.geojson", layer_options={"COORDINATE_PRECISION": 5}

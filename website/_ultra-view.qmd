@@ -1,0 +1,254 @@
+<!-- The every-trail route: stats, map, legend, elevation profile and GPX, for
+the Ultra and Bikes pages. Needs _common.qmd, and an ULTRA cell on the page:
+({file, trails: "park trail", done: "run", gpxTitle, gpxFile}). Its names
+(ultraMap, ultraProfile, ...) don't clash with the route picker's. -->
+
+```{ojs}
+//| echo: false
+ultra = d3.json(ULTRA.file) // FileAttachment only takes a literal name
+stats = ultra.stats
+
+function kmRange([a, b]) {
+  const [from, to] = [Math.round(a), Math.round(b)];
+  return from === to ? `km ${from}` : `km ${from}–${to}`;
+}
+
+// "start, km 19–21, km 51, finish" for the Park Centre; just the km elsewhere.
+function aidPasses(name, stops) {
+  const kms = stops.map(kmRange);
+  return name === "Park Centre" ? ["start", ...kms.slice(1, -1), "finish"].join(", ") : kms.join(", ");
+}
+
+// Aid station passes (km), the sure ones or the optional ones.
+function aidKm(optional) {
+  return Object.entries(stats.aid)
+    .filter(([name]) => stats.aid_optional.includes(name) === optional)
+    .flatMap(([, stops]) => stops.map(([a]) => a));
+}
+
+// Labels for the passes mid-run, at the top of the profile.
+function aidLabels(optional) {
+  return aidKm(optional).filter((km) => km > 0 && km < stats.km).map((km) => ({km}));
+}
+
+function onTheWay(kind) {
+  return stats.on_the_way.filter(([, , kinds]) => kinds.includes(kind)).map(kmRange);
+}
+water = onTheWay("water")
+
+html`<div class="route-card">
+  <p class="route-stats">
+    <strong>${stats.km} km</strong> ·
+    <strong>↑ ${stats.gain_m} m ↓ ${stats.loss_m} m</strong> ·
+    every trail (${stats.trail_km} of ${stats.park_trail_km} km of ${ULTRA.trails}) ·
+    ${stats.repeat_km} km ${ULTRA.done} twice · ${stats.street_pct}% street
+  </p>
+  <p class="route-stats">
+    <strong>Aid stations</strong>: ${Object.entries(stats.aid)
+      .map(([name, stops]) => `${stats.aid_optional.includes(name) ? "optional, if there's a second car: " : ""}${name} (${aidPasses(name, stops)})`)
+      .join("; ")} ·
+    <strong>Toilets on the way</strong>: ${onTheWay("toilets").join(", ")} ·
+    <strong>Water</strong>: the Park Centre${water.length ? `, and near ${water.join(", ")}` : " only"}
+  </p>
+  <p class="route-id">Short dead-end offshoots are optional: without them it's
+    ${stats.km_without_offshoots} km (they add ${stats.offshoot_km} km, out and back).</p>
+</div>`
+```
+
+```{ojs}
+//| echo: false
+ultraMapDiv = html`<div class="route-map ultra-map"></div>`
+```
+
+```{ojs}
+//| echo: false
+html`<div class="ultra-legend">
+  <span><i style="background:#2a78d6"></i>first time along</span>
+  <span><i style="background:#eb6834"></i>${ULTRA.done} a second time</span>
+  <span><i class="dashed"></i>optional offshoot</span>
+  <span><b class="km">5</b>km marker</span>
+  ${Object.entries(amenity.AMENITY).map(([kind, text]) =>
+    html`<span><img src=${ICONS[kind].toDataURL()} alt="">${text.toLowerCase()}</span>`)}
+</div>`
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+// Toilets, water, or both: drawn by amenities.js, the same as on the route pages.
+ICONS = amenity.icons()
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+ultraMap = {
+  const m = new maplibregl.Map({
+    container: ultraMapDiv,
+    style: "https://tiles.openfreemap.org/styles/positron",
+    center: START,
+    zoom: 12.5,
+    attributionControl: {customAttribution: "Trails © OpenStreetMap contributors (ODbL)"}
+  });
+  m.addControl(new maplibregl.NavigationControl(), "top-right");
+  m.addControl(new maplibregl.FullscreenControl(), "top-right");
+  await new Promise((resolve) => m.on("load", resolve));
+  m.addSource("labels", {type: "geojson", data: labels});
+  m.addSource("segments", {type: "geojson", data: ultra.segments});
+  m.addSource("points", {type: "geojson", data: ultra.points});
+  m.addSource("hover", {type: "geojson", data: EMPTY});
+  const round = {"line-join": "round", "line-cap": "round"};
+  const width = ["interpolate", ["linear"], ["zoom"], 12, 2.5, 16, 5];
+  const kind = (k) => ["==", ["get", "class"], k];
+  m.addLayer({id: "trails", type: "line", source: "labels", layout: round,
+              filter: ["==", ["get", "kind"], "trail"],
+              paint: {"line-color": "#6b8f71", "line-opacity": 0.6, "line-width": 1}});
+  // Stretches run twice are drawn beside the first pass, so both show.
+  m.addLayer({id: "repeat", type: "line", source: "segments", layout: round, filter: kind("repeat"),
+              paint: {"line-color": "#eb6834", "line-width": width, "line-offset": 3}});
+  m.addLayer({id: "first", type: "line", source: "segments", layout: round, filter: kind("first"),
+              paint: {"line-color": "#2a78d6", "line-width": width}});
+  m.addLayer({id: "optional", type: "line", source: "segments", filter: kind("optional"),
+              paint: {"line-color": "#4a3aa7", "line-width": width, "line-dasharray": [1, 1]}});
+  m.addLayer({id: "arrows", type: "symbol", source: "segments",
+              layout: {"symbol-placement": "line", "symbol-spacing": 120, "text-field": "›",
+                       "text-font": ["Noto Sans Bold"], "text-size": 18,
+                       "text-keep-upright": false, "text-allow-overlap": true,
+                       "text-ignore-placement": true},
+              paint: {"text-color": "#0b0b0b"}});
+  const halo = {"text-halo-color": "#fcfcfb", "text-halo-width": 1.5};
+  const along = (size, font) => ({"symbol-placement": "line", "text-field": ["get", "name"],
+    "text-font": [font], "text-size": size, "text-max-angle": 45, "symbol-spacing": 250});
+  m.addLayer({id: "street-labels", type: "symbol", source: "labels", minzoom: 13,
+              filter: ["==", ["get", "kind"], "street"], layout: along(10.5, "Noto Sans Regular"),
+              paint: {"text-color": "#52514e", ...halo}});
+  m.addLayer({id: "trail-labels", type: "symbol", source: "labels", minzoom: 13,
+              filter: ["==", ["get", "kind"], "trail"], layout: along(11, "Noto Sans Italic"),
+              paint: {"text-color": "#3d6b47", ...halo}});
+  // km markers and toilets
+  m.addLayer({id: "km", type: "circle", source: "points", filter: ["==", ["get", "kind"], "km"],
+              paint: {"circle-radius": 11, "circle-color": "#fcfcfb",
+                      "circle-stroke-color": "#0b0b0b", "circle-stroke-width": 2}});
+  m.addLayer({id: "km-labels", type: "symbol", source: "points", filter: ["==", ["get", "kind"], "km"],
+              layout: {"text-field": ["get", "label"], "text-font": ["Noto Sans Bold"],
+                       "text-size": 11, "text-allow-overlap": true},
+              paint: {"text-color": "#0b0b0b"}});
+  // Toilets and water on the way (with the km of each pass, in the popup)
+  amenity.addToMap(m, maplibregl, {
+    type: "FeatureCollection",
+    features: ultra.points.features.filter((f) => f.properties.kind in amenity.AMENITY)
+  });
+  m.addLayer({id: "hover", type: "circle", source: "hover",
+              paint: {"circle-radius": 7, "circle-color": "#eb6834",
+                      "circle-stroke-color": "#fcfcfb", "circle-stroke-width": 2}});
+  for (const f of ultra.points.features.filter((f) => f.properties.kind === "aid")) {
+    const main = f.properties.name === "Park Centre"; // also the start and finish
+    new maplibregl.Marker({color: main ? "#0b0b0b" : "#898781"})
+      .setLngLat(f.geometry.coordinates)
+      .setPopup(new maplibregl.Popup().setText(
+        `${main ? "Start, finish and aid station" : f.properties.optional
+          ? "Optional aid station, if there's a second car" : "Aid station"}: ${f.properties.name}, ${f.properties.label}`))
+      .addTo(m);
+  }
+  const bounds = new maplibregl.LngLatBounds();
+  ultra.full.forEach((c) => bounds.extend(c));
+  m.fitBounds(bounds, {padding: 30, duration: 0});
+  invalidation.then(() => m.remove());
+  return m;
+}
+```
+
+```{ojs}
+//| echo: false
+ultraProfile = ultra.profile.map(([km, m, lon, lat]) => ({km, m, lon, lat}))
+
+// Toilets and water on the way, as on the map (amenities.js).
+ultraPassed = amenity.onProfile(stats.passes_by, ultraProfile)
+
+// What's at this km, for the tooltip.
+function whatsHere(km) {
+  const near = (a, b = a) => a - 0.15 <= km && km <= b + 0.15;
+  const what = Object.entries(stats.aid)
+    .filter(([, stops]) => stops.some(([a, b]) => near(a, b)))
+    .map(([name]) => `${stats.aid_optional.includes(name) ? "optional aid station" : "aid station"} (${name})`);
+  what.push(...amenity.passedNear(stats.passes_by, km));
+  return what.length ? ` · ${what.join(", ")}` : "";
+}
+
+viewof ultraHere = {
+  const profile = ultraProfile;
+  const low = Math.floor((d3.min(profile, (d) => d.m) - 5) / 10) * 10;
+  return Plot.plot({
+    width,
+    height: 190,
+    marginLeft: 44,
+    marginTop: 26, // room for the AS labels
+    style: {fontSize: "12px"},
+    x: {label: "km →", domain: [0, stats.km]},
+    y: {label: "↑ elevation (m)", domain: [low, d3.max(profile, (d) => d.m) + 20], grid: true},
+    marks: [
+      Plot.areaY(profile, {x: "km", y1: low, y2: "m", fill: "#2a78d6", fillOpacity: 0.12}),
+      Plot.lineY(profile, {x: "km", y: "m", stroke: "#2a78d6", strokeWidth: 1.5}),
+      // Aid station passes
+      // Aid stations: the Park Centre bold ("AS"); the optional one grey and
+      // dotted ("(AS)"), as it may not be there
+      Plot.ruleX(aidKm(false), {stroke: "#0b0b0b", strokeWidth: 1.5, strokeDasharray: "5,3"}),
+      Plot.ruleX(aidKm(true), {stroke: "#898781", strokeDasharray: "2,3"}),
+      Plot.text(aidLabels(false), {x: "km", text: () => "AS", frameAnchor: "top", dy: -8,
+                                   fontSize: 10, fontWeight: 700, fill: "#0b0b0b"}),
+      Plot.text(aidLabels(true), {x: "km", text: () => "(AS)", frameAnchor: "top", dy: -8,
+                                  fontSize: 10, fill: "#898781"}),
+      ...amenity.profileMarks(Plot, ultraPassed),
+      Plot.ruleX(profile, Plot.pointerX({x: "km", stroke: "#52514e"})),
+      Plot.dot(profile, Plot.pointerX({x: "km", y: "m", fill: "#eb6834", r: 4})),
+      Plot.tip(profile, Plot.pointerX({x: "km", y: "m",
+        title: (d) => `${d.km.toFixed(1)} km · ${Math.round(d.m)} m${whatsHere(d.km)}`}))
+    ]
+  });
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+ultraMap.getSource("hover").setData(
+  ultraHere?.lon
+    ? {type: "Feature", geometry: {type: "Point", coordinates: [ultraHere.lon, ultraHere.lat]}}
+    : EMPTY
+)
+```
+
+On the profile, **AS** marks the passes by the Park Centre aid station and a
+grey **(AS)** the optional one at King Edward; the WC and W dots are the
+toilets and water on the way.
+
+```{ojs}
+//| echo: false
+function ultraGpx(name, coordinates) {
+  const points = coordinates.map(([lon, lat]) => `<trkpt lat="${lat}" lon="${lon}"></trkpt>`);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="psp-trails" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${name}</name>
+    <trkseg>
+      ${points.join("\n      ")}
+    </trkseg>
+  </trk>
+</gpx>`;
+}
+
+html`<div class="route-actions">
+  ${DOM.download(
+    () => new Blob([ultraGpx(`${ULTRA.gpxTitle} (${stats.km} km)`, ultra.full)],
+                   {type: "application/gpx+xml"}),
+    `${ULTRA.gpxFile}.gpx`,
+    "Download GPX"
+  )}
+  ${DOM.download(
+    () => new Blob([ultraGpx(`${ULTRA.gpxTitle}, no offshoots (${stats.km_without_offshoots} km)`, ultra.main)],
+                   {type: "application/gpx+xml"}),
+    `${ULTRA.gpxFile}-no-offshoots.gpx`,
+    "GPX without offshoots"
+  )}
+</div>`
+```

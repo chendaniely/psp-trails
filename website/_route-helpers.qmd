@@ -1,0 +1,58 @@
+<!-- Helpers for the route pages (ROTD, Routes, Bikes): include once per page. -->
+
+```{ojs}
+//| echo: false
+//| output: false
+// Two-thumb distance slider: its value is [low, high] in km.
+function rangeSlider({min, max, step, value, label}) {
+  const form = html`<form class="range2">
+    <label>${label}</label>
+    <div class="range2-track">
+      <input type="range" name="lo" min=${min} max=${max} step=${step} value=${value[0]} aria-label="Shortest">
+      <input type="range" name="hi" min=${min} max=${max} step=${step} value=${value[1]} aria-label="Longest">
+    </div>
+    <output name="out"></output>
+  </form>`;
+  const {lo, hi, out} = form.elements;
+  const track = form.querySelector(".range2-track");
+  const pct = (v) => `${(100 * (v - min)) / (max - min)}%`;
+  const update = () => {
+    form.value = [+lo.value, +hi.value];
+    out.value = `${lo.value}–${hi.value} km`;
+    track.style.setProperty("--lo", pct(lo.value));
+    track.style.setProperty("--hi", pct(hi.value));
+  };
+  form.addEventListener("input", (event) => {
+    // Thumbs can't pass each other.
+    if (+lo.value > +hi.value) {
+      if (event.target === lo) lo.value = hi.value;
+      else hi.value = lo.value;
+    }
+    update();
+  });
+  form.addEventListener("submit", (event) => event.preventDefault());
+  update();
+  return form;
+}
+
+function outline(f, size) {
+  // Route shape, north up, scaled to fit a square.
+  const pts = f.geometry.coordinates;
+  const k = Math.cos((pts[0][1] * Math.PI) / 180);
+  const xs = pts.map(([lon]) => lon * k), ys = pts.map(([, lat]) => lat);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const scale = (size - 12) / Math.max(x1 - x0, y1 - y0);
+  const dx = (size - (x1 - x0) * scale) / 2, dy = (size - (y1 - y0) * scale) / 2;
+  const P = pts.map((_, i) => [dx + (xs[i] - x0) * scale, size - dy - (ys[i] - y0) * scale]);
+  const line = P.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const i = Math.floor(P.length * 0.08); // an arrow early on shows the direction
+  const [ax, ay] = P[i], [bx, by] = P[Math.min(i + 3, P.length - 1)];
+  const angle = (Math.atan2(by - ay, bx - ax) * 180) / Math.PI;
+  return `<svg class="pc-outline" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+    <polyline points="${line}" fill="none" stroke="#0b0b0b" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M -5 -4 L 4 0 L -5 4 z" fill="#0b0b0b" transform="translate(${bx.toFixed(1)} ${by.toFixed(1)}) rotate(${angle.toFixed(0)})"/>
+    <circle cx="${P[0][0].toFixed(1)}" cy="${P[0][1].toFixed(1)}" r="4" fill="#fff" stroke="#0b0b0b" stroke-width="2"/>
+    <text x="${size - 2}" y="10" text-anchor="end" font-size="9" font-weight="700">N↑</text>
+  </svg>`;
+}
+```

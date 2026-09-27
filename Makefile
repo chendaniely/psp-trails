@@ -19,9 +19,9 @@
 
 PY := uv run python
 
-.PHONY: all download map check routes ultra view website preview test lint clean clean-data
+.PHONY: all download map check routes ultra bikes view website preview test lint clean clean-data
 
-all: map check routes ultra
+all: map check routes ultra bikes
 
 # 01 · Park boundary: Metro Vancouver (official) + OpenStreetMap
 data/raw/park_boundary_metrovan.geojson: 01_download_park_boundary.py
@@ -67,6 +67,16 @@ data/processed/ultra.json: 08_plan_ultra.py psp.py routing.py data/processed/way
 
 ultra: data/processed/ultra.json
 
+# 07 and 08 again for bikes (MODE=bike): every trail but the hiking-only ones,
+# twice the distances, no written directions
+data/processed/bike_routes.geojson data/processed/bike_coverage.json: 07_generate_routes.py psp.py routing.py data/processed/ways.gpkg data/raw/node_elevation.csv data/raw/osm_amenities.geojson
+	MODE=bike $(PY) $<
+
+data/processed/bike_ultra.json: 08_plan_ultra.py psp.py routing.py data/processed/ways.gpkg data/raw/node_elevation.csv data/raw/osm_amenities.geojson
+	MODE=bike $(PY) $<
+
+bikes: data/processed/bike_routes.geojson data/processed/bike_ultra.json
+
 view: output/trail_map.html
 	$(PY) -m webbrowser "file://$(CURDIR)/$<"
 
@@ -91,10 +101,20 @@ website/coverage.json: data/processed/coverage.json
 website/ultra.json: data/processed/ultra.json
 	cp $< $@
 
-website: website/trail_map.html website/routes.geojson website/labels.geojson website/amenities.geojson website/coverage.json website/ultra.json
+website/bike_routes.geojson: data/processed/bike_routes.geojson
+	cp $< $@
+
+website/bike_ultra.json: data/processed/bike_ultra.json
+	cp $< $@
+
+SITE_DATA := website/trail_map.html website/labels.geojson website/amenities.geojson \
+	website/routes.geojson website/coverage.json website/ultra.json \
+	website/bike_routes.geojson website/bike_ultra.json
+
+website: $(SITE_DATA)
 	quarto render website
 
-preview: website/trail_map.html website/routes.geojson website/labels.geojson website/amenities.geojson website/coverage.json website/ultra.json
+preview: $(SITE_DATA)
 	quarto preview website
 
 test:
@@ -105,7 +125,7 @@ lint:
 	uv run ruff check .
 
 clean:
-	rm -rf output data/processed website/_site website/.quarto website/trail_map.html website/routes.geojson website/labels.geojson website/amenities.geojson website/coverage.json website/ultra.json
+	rm -rf output data/processed website/_site website/.quarto $(SITE_DATA)
 
 clean-data:
 	rm -rf data/raw data/cache

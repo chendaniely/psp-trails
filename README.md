@@ -99,8 +99,11 @@ Each route also gets:
   toilets and water as landmarks; plus a short form for printed cards
   (`T← Salish`, `Y↗ Council`).
 
-The website's **Routes** page picks one: loops by default, 7–10 km on a
-two-thumb slider, and the same "route of the day" for everyone. Route ids
+The website's **ROTD** (route of the day, `rotd.qmd`) page picks one: loops
+by default, 7–10 km on a two-thumb slider, and the same "route of the day"
+for everyone. **Routes** (`routes.qmd`) lists every route as a card to filter,
+search and sort; a card opens that route on ROTD (`?route=<key>&from=list`),
+and an old `routes.html?route=<key>` link redirects there. Route ids
 (L01, L02, …; OB01, …) are positions in the library, shortest first, so they
 can change when the library is regenerated. The page shuffles the routes
 matching your choices with a random generator seeded by today's date in
@@ -112,11 +115,16 @@ phone allows) through the phone's share sheet, with a link ending in
 keeps opening that route. On a computer the button is **Copy link** and
 copies the same text. **Image** (for social media) and **Card image** (the
 printable card, to keep on a phone) go to the share sheet on phones and
-download elsewhere. See `website/routes.qmd` and the About page.
+download elsewhere. See `website/rotd.qmd` and the About page.
 It shows the map, elevation profile, directions, a cue sheet, a GPX download
 and printable cards (2 to 12 per page; 8 is palm size). Toilets and water
 (05 writes `amenities.geojson`) are always on the map, and marked on the
 profile where the route passes them.
+**Bikes** (`bikes.qmd`) is the same for bikes, from 07 and 08 run with
+`MODE=bike` (`make bikes`): every trail but the hiking-only ones
+(`psp.bike_ways`), 8–24 km (14–20 by default), loops round 3–7 turn points
+so long rides stay in a park 4 km across, no written directions; plus the
+bike ultra (every trail open to bikes, ~50 km).
 If a route goes somewhere we wouldn't, that's usually a data fix in
 `data/manual/`.
 

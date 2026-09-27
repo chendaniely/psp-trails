@@ -29,14 +29,17 @@ On a phone, the [full-screen map](trail_map.html){target="_blank"} is easier to 
 
 ## Routes
 
-The [Routes](routes.qmd) page picks a loop (or out-and-back) from the Park
-Centre at the distance you choose: the same route of the day for everyone,
-or shuffle for another. Each comes with an elevation profile, written
+The [route of the day](rotd.qmd) (ROTD) page picks a loop (or out-and-back)
+from the Park Centre at the distance you choose: the same route of the day
+for everyone, or shuffle for another. [Routes](routes.qmd) lists every route
+by its number, to filter and pick from. Each comes with an elevation profile, written
 directions, a GPX file, an image for sharing, and palm-size cards to print
 for anyone running without a device (or to save as a picture on your phone).
-Toilets and water are always on the Routes map, and marked on the elevation
+Toilets and water are always on the route map, and marked on the elevation
 profile where the route passes them (within 40 m). The [Ultra](ultra.qmd)
-page is one route over every trail in the park.
+page is one route over every trail in the park. [Bikes](bikes.qmd) does the
+same for bikes: rides of 8–24 km and one ride over every trail open to them,
+leaving out the hiking-only trails.
 
 ### How routes are made and picked
 

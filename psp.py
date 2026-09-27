@@ -18,7 +18,7 @@ import osmnx as ox
 import pandas as pd
 import pyproj
 import requests
-from shapely import LineString, Point
+from shapely import LineString, Point, get_coordinates
 
 # Paths --------------------------------------------------------------------
 
@@ -239,6 +239,26 @@ def bike_access(bicycle: pd.Series) -> pd.Series:
     bike[bicycle.isin(BIKE_SHARED)] = "shared"
     bike[bicycle.isin(BIKE_HIKING_ONLY)] = "hiking only"
     return bike
+
+
+def bike_ways(ways: gpd.GeoDataFrame, snap_m: float = 5) -> gpd.GeoDataFrame:
+    """Step 04's ways for bikes: hiking-only trails, and paths outside the park
+    tagged no bikes, are marked removed ("hiking only"), as are our connectors
+    left without a way to join at either end. Everything else stays: shared
+    and untagged trails, streets, and sidewalks and crossings (walk the bike)."""
+    ways = ways.copy()
+    bicycle = ways.get("bicycle", pd.Series(None, index=ways.index, dtype=object))
+    no_bikes = (ways["bike"] == "hiking only") | (
+        (ways["kind"] == "other path") & bicycle.isin(BIKE_HIKING_ONLY)
+    )
+    ways.loc[no_bikes & ways["removed"].isna(), "removed"] = "hiking only"
+    kept = ways["removed"].isna() & (ways["kind"] != "excluded")
+    nodes = get_coordinates(ways[kept & (ways["kind"] != "connector")].to_crs(CRS_METRIC).geometry.values)  # fmt: skip
+    connectors = ways[kept & (ways["kind"] == "connector")].to_crs(CRS_METRIC)
+    for i, line in connectors.geometry.items():
+        if any(np.hypot(*(nodes - end).T).min() > snap_m for end in (line.coords[0], line.coords[-1])):  # fmt: skip
+            ways.loc[i, "removed"] = "hiking only"
+    return ways
 
 
 # Toilets and drinking water --------------------------------------------------------

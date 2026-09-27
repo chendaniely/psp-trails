@@ -7,9 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Trail network, route generator and website for a trail-running group in
 Pacific Spirit Regional Park (Vancouver, BC). Runs start and finish at the
 **Park Centre** (OSM node 317125595, Cleveland Trail at W 16th Ave). The site
-(Quarto, GitHub Pages) shows the trail map and a Routes page that picks a
-"route of the day" with elevation profile, written directions, GPX, share
-link and printable cards.
+(Quarto, GitHub Pages) shows the trail map, a route of the day (ROTD) with
+elevation profile, written directions, GPX, share link and printable cards,
+a Routes list of every route, the Ultra (every trail in one run), and Bikes
+(the same for bikes, without the hiking-only trails).
 
 Repo: <https://github.com/pstrunners/pstrunners.github.io> (the pstrunners
 organization's Pages repo, so the site is served at the root:
@@ -116,6 +117,15 @@ and `cost`. A route is a list of steps `(u, v, key)`.
   (`T← Salish`, `Y↗ Council`). Tests in `tests/test_routing.py` build small
   synthetic graphs for each case; add one when changing this logic.
 
+**Bikes** (`MODE=bike` for 07 and 08; `make bikes`): `psp.bike_ways` marks
+hiking-only trails (and outside paths tagged no bikes) removed, plus our
+connectors left dangling; `routing.BIKE_COST_PER_M` makes a sidewalk cost 6
+(walk the bike). 07: 8–24 km (14–20 focus), ≥75% trail, ≤15% street, 65%
+overlap, profile every 100 m, no directions, ids "BL…", `LOOP_BANDS` with 3/4/7
+turn points (`make_loops(turns=…)`; the park's bike network reaches only
+~4 km from the start, so two far turn points mean road). Outputs are prefixed
+`bike_`.
+
 **Ultra** (`08_plan_ultra.py`, `routing.postman_route`): required = junction
 stretches that are ≥50% park trail. Join the pieces with an MST of cheapest
 paths, pair odd junctions with `nx.min_weight_matching` over cheapest-path
@@ -137,8 +147,18 @@ closest pass if 40–100 m off (labelled as a detour). ~62 km, 3 s to compute. A
 far from the rest can cost the ultra kilometres of detour: check the route and
 remove such stubs in `data/manual/` (as with the SW/NW Marine Dr stub).
 
-**Website** (`website/`, Quarto): `index.qmd` iframes `trail_map.html`;
-`routes.qmd` is Observable JS reading `routes.geojson`:
+**Website** (`website/`, Quarto): `index.qmd` iframes `trail_map.html`.
+The route pages share OJS partials (`{{< include >}}`, `_*.qmd`, not rendered
+on their own): `_common.qmd` (MapLibre, labels, amenities), `_route-helpers.qmd`
+(distance slider, route outline), `_route-picker.qmd` (controls, route of the
+day, map, profile, GPX/share/image; set by a `PICKER` cell) and
+`_ultra-view.qmd` (every-trail stats, map, profile, GPX; set by an `ULTRA`
+cell; its names are prefixed `ultra…` so it can share a page with the
+picker). `rotd.qmd` = picker + cards/directions/cue sheet; `bikes.qmd` =
+picker + ultra view on the bike files; `ultra.qmd` = ultra view + directions;
+`routes.qmd` lists every route (runs or bike rides) and links each to its page
+with `?route=<key>&from=list`. Partials load data with `d3.json(...)`:
+`FileAttachment` only takes a literal file name.
 - Route of the day: routes matching the filters are shuffled with
   mulberry32 seeded by FNV-1a of today's date in America/Vancouver
   (Fisher–Yates); order[0] is the route of the day, "Another route" steps
@@ -149,7 +169,7 @@ remove such stubs in `data/manual/` (as with the SW/NW Marine Dr stub).
   sheet) are named in bold at their midpoints and their faint labels hidden.
 - Toilets / water: `psp.amenity_sites` (public only, one site where within
   25 m: toilets / water / both) → 05 writes `amenities.geojson` (always on
-  the Routes map); `routing.site_passes` gives each route's (07) and the
+  the route maps); `routing.site_passes` gives each route's (07) and the
   ultra's (08) `passes_by` [km, kind, m off] for the profile (07 skips the
   first/last 250 m: every route starts at the Park Centre's). Both pages
   draw them with the shared `website/amenities.js` (loaded with `import()`

@@ -1,0 +1,47 @@
+---
+title: "Bikes"
+subtitle: "Rides from the Park Centre on the trails open to bikes"
+format:
+  html:
+    include-in-header:
+      text: |
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+---
+
+Rides on every trail in the park that's open to bikes: all but the
+hiking-only ones. Like the [route of the day](rotd.qmd), they start and finish at the
+**Park Centre** (Cleveland Trail at W 16th Ave) and use streets only to link
+trails up, at bike distances. Everyone who opens this page on the same day,
+with the same choices, gets the same ride of the day; **Another route**
+shuffles; [Routes](routes.html?bikes) lists them all. Where a ride crosses a
+street on a crosswalk, walk your bike.
+
+```{ojs}
+//| echo: false
+//| output: false
+// The route picker's settings (_route-picker.qmd): bike routes (step 07,
+// MODE=bike), twice the runners' distances, no share link.
+PICKER = ({file: "bike_routes.geojson", km: [8, 24], defaultKm: [14, 20], share: false,
+           list: "routes.html?bikes"})
+```
+
+{{< include _common.qmd >}}
+
+{{< include _route-helpers.qmd >}}
+
+{{< include _route-picker.qmd >}}
+
+## Every bike trail in one ride
+
+The bike version of the [Ultra](ultra.qmd): one ride over every trail open
+to bikes, from the Park Centre and back, with the same aid stations.
+
+```{ojs}
+//| echo: false
+//| output: false
+// The every-trail view's settings (_ultra-view.qmd): step 08, MODE=bike.
+ULTRA = ({file: "bike_ultra.json", trails: "trail open to bikes", done: "ridden",
+          gpxTitle: "Pacific Spirit every bike trail", gpxFile: "psp-bike-every-trail"})
+```
+
+{{< include _ultra-view.qmd >}}

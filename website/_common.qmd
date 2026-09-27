@@ -1,0 +1,14 @@
+<!-- Shared by the map pages (Routes, Ultra, Bikes): include once per page. -->
+
+```{ojs}
+//| echo: false
+//| output: false
+// MapLibre, trail and street names (step 05), and toilets and water (step 05,
+// drawn by amenities.js).
+maplibregl = require("maplibre-gl@5.24.0/dist/maplibre-gl.js")
+START = [-123.22248, 49.25918] // Park Centre
+EMPTY = ({type: "FeatureCollection", features: []})
+labels = FileAttachment("labels.geojson").json()
+amenitySites = FileAttachment("amenities.geojson").json()
+amenity = import(new URL("amenities.js", document.baseURI).href)
+```

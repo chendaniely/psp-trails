@@ -10,6 +10,8 @@ project:
     - amenities.js
     - ultra.json
     - coverage.json
+    - bike_routes.geojson
+    - bike_ultra.json
 
 website:
   title: "Pacific Spirit Trails"
@@ -18,18 +20,22 @@ website:
   page-navigation: false
   navbar:
     left:
-      - href: index.qmd
-        text: Map
+      - href: rotd.qmd
+        text: ROTD
       - href: routes.qmd
         text: Routes
       - href: ultra.qmd
         text: Ultra
-      - href: about.qmd
-        text: About
+      - href: bikes.qmd
+        text: Bikes
     right:
+      - href: index.qmd
+        text: Map
       - href: trail_map.html
         text: Full-screen map
         target: _blank
+      - href: about.qmd
+        text: About
       - icon: github
         href: https://github.com/pstrunners/pstrunners.github.io
         aria-label: Source code on GitHub
