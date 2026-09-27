@@ -269,7 +269,11 @@ def walk_graph(
             continue
         lons = [pt["lon"] for pt in el["geometry"]]
         lats = [pt["lat"] for pt in el["geometry"]]
-        points = list(zip(el["nodes"], *to_metric.transform(lons, lats)))
+        # Round to the centimetre: projection maths differs in the last digits
+        # between machines (Mac vs the Linux CI), and those crumbs could
+        # break ties between equal routes differently. Rounded, they can't.
+        xs, ys = np.round(to_metric.transform(lons, lats), 2)
+        points = list(zip(el["nodes"], xs, ys))
         cut = range(0)
         if el["id"] in cuts:
             i, j = sorted(el["nodes"].index(n) for n in cuts[el["id"]])
@@ -282,7 +286,7 @@ def walk_graph(
             G.add_edge(
                 a,
                 b,
-                length=math.hypot(xb - xa, yb - ya),
+                length=round(math.hypot(xb - xa, yb - ya), 2),
                 osm_id=el["id"],
                 name=el.get("tags", {}).get("name"),
                 kind=kind_of[el["id"]],
@@ -299,7 +303,13 @@ def walk_graph(
             if gaps.min() > snap_m:
                 raise ValueError(f"Connector {name!r}: no node within {snap_m} m")
             ends.append(node_ids[gaps.argmin()])
-        G.add_edge(*ends, length=line.length, osm_id=None, name=name, kind="connector")
+        G.add_edge(
+            *ends,
+            length=round(line.length, 2),
+            osm_id=None,
+            name=name,
+            kind="connector",
+        )
 
     if elevation is not None:
         for node in G:

@@ -93,7 +93,7 @@ of the day.
 ## Our edits
 
 OpenStreetMap has more than we run and misses a few links we use, so we keep
-a small set of [edits](https://github.com/chendaniely/psp-trails/tree/main/data/manual):
+a small set of [edits](https://github.com/pstrunners/pstrunners.github.io/tree/main/data/manual):
 
 - NW and SW Marine Drive are the park's edge for us: beach and foreshore
   trails below them are left out, as are a few dead-end stubs, parking-lot
@@ -114,6 +114,6 @@ a small set of [edits](https://github.com/chendaniely/psp-trails/tree/main/data/
 
 If a public trail is missing or wrong, the best fix is in
 [OpenStreetMap](https://www.openstreetmap.org/) itself, so every map and app
-gets it. The code is on [GitHub](https://github.com/chendaniely/psp-trails).
+gets it. The code is on [GitHub](https://github.com/pstrunners/pstrunners.github.io).
 
 Please stay on marked trails and follow the park's rules on bikes and dogs.

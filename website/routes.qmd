@@ -406,7 +406,7 @@ function cardHtml(f, layout) {
     </div>
     <div class="pc-foot">
       <span>← → turn · ↖↗ slight · ↙↘ sharp · T T-junction · Y fork · ↑ straight · WC toilets</span>
-      <span>${esc(p.id)} · chendaniely.github.io/psp-trails</span>
+      <span>${esc(p.id)} · pstrunners.github.io</span>
     </div>
   </div>`;
 }
@@ -519,6 +519,6 @@ route
 ```
 
 Routes are generated from OpenStreetMap data and our own
-[edits](https://github.com/chendaniely/psp-trails/tree/main/data/manual);
+[edits](https://github.com/pstrunners/pstrunners.github.io/tree/main/data/manual);
 elevation is NRCan lidar. Check trail closures and park rules before you go,
 and stay on marked trails.

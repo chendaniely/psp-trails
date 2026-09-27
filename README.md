@@ -53,7 +53,7 @@ map. On every push to `main`, the GitHub Action in
 `.github/workflows/publish-website.yml` rebuilds the map from the committed
 OSM snapshot in `data/raw/` (steps 04–07, no downloads), stops if a
 connection check fails, and publishes the site to the `gh-pages` branch:
-<https://chendaniely.github.io/psp-trails/>.
+<https://pstrunners.github.io/>.
 
 To update the site with fresh OSM data: `make clean-data && make`, check the
 map and the connection checks, then commit `data/raw/` and push.

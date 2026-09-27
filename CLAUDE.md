@@ -11,6 +11,10 @@ Pacific Spirit Regional Park (Vancouver, BC). Runs start and finish at the
 "route of the day" with elevation profile, written directions, GPX, share
 link and printable cards.
 
+Repo: <https://github.com/pstrunners/pstrunners.github.io> (the pstrunners
+organization's Pages repo, so the site is served at the root:
+<https://pstrunners.github.io/>). The project itself is still called psp-trails.
+
 ## Commands
 
 ```bash

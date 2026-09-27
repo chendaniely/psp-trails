@@ -8,8 +8,8 @@ project:
 
 website:
   title: "Pacific Spirit Trails"
-  site-url: https://chendaniely.github.io/psp-trails/
-  repo-url: https://github.com/chendaniely/psp-trails
+  site-url: https://pstrunners.github.io/
+  repo-url: https://github.com/pstrunners/pstrunners.github.io
   page-navigation: false
   navbar:
     left:
@@ -23,7 +23,7 @@ website:
       - href: trail_map.html
         text: Full-screen map
       - icon: github
-        href: https://github.com/chendaniely/psp-trails
+        href: https://github.com/pstrunners/pstrunners.github.io
         aria-label: Source code on GitHub
 
 format:
