@@ -43,6 +43,11 @@ function aidKm(optional) {
     .flatMap(([, stops]) => stops.map(([a]) => a));
 }
 
+// Labels for the passes mid-run, at the top of the profile.
+function aidLabels(optional) {
+  return aidKm(optional).filter((km) => km > 0 && km < stats.km).map((km) => ({km}));
+}
+
 function onTheWay(kind) {
   return stats.on_the_way.filter(([, , kinds]) => kinds.includes(kind)).map(kmRange);
 }
@@ -196,8 +201,9 @@ viewof here = {
   const low = Math.floor((d3.min(profile, (d) => d.m) - 5) / 10) * 10;
   return Plot.plot({
     width,
-    height: 180,
+    height: 190,
     marginLeft: 44,
+    marginTop: 26, // room for the AS labels
     style: {fontSize: "12px"},
     x: {label: "km →", domain: [0, stats.km]},
     y: {label: "↑ elevation (m)", domain: [low, d3.max(profile, (d) => d.m) + 20], grid: true},
@@ -205,9 +211,14 @@ viewof here = {
       Plot.areaY(profile, {x: "km", y1: low, y2: "m", fill: "#2a78d6", fillOpacity: 0.12}),
       Plot.lineY(profile, {x: "km", y: "m", stroke: "#2a78d6", strokeWidth: 1.5}),
       // Aid station passes
-      // Aid stations: the Park Centre bold; the optional one faint, as it may not be there
+      // Aid stations: the Park Centre bold ("AS"); the optional one grey and
+      // dotted ("(AS)"), as it may not be there
       Plot.ruleX(aidKm(false), {stroke: "#0b0b0b", strokeWidth: 1.5, strokeDasharray: "5,3"}),
-      Plot.ruleX(aidKm(true), {stroke: "#898781", strokeOpacity: 0.5, strokeDasharray: "1,3"}),
+      Plot.ruleX(aidKm(true), {stroke: "#898781", strokeDasharray: "2,3"}),
+      Plot.text(aidLabels(false), {x: "km", text: () => "AS", frameAnchor: "top", dy: -8,
+                                   fontSize: 10, fontWeight: 700, fill: "#0b0b0b"}),
+      Plot.text(aidLabels(true), {x: "km", text: () => "(AS)", frameAnchor: "top", dy: -8,
+                                  fontSize: 10, fill: "#898781"}),
       ...amenity.profileMarks(Plot, passed),
       Plot.ruleX(profile, Plot.pointerX({x: "km", stroke: "#52514e"})),
       Plot.dot(profile, Plot.pointerX({x: "km", y: "m", fill: "#eb6834", r: 4})),
@@ -228,9 +239,9 @@ map.getSource("hover").setData(
 )
 ```
 
-On the profile, the dashed lines are the passes by the Park Centre aid
-station (the faint dotted ones: the optional one at King Edward), and the WC
-and W dots the toilets and water on the way.
+On the profile, **AS** marks the passes by the Park Centre aid station and a
+grey **(AS)** the optional one at King Edward; the WC and W dots are the
+toilets and water on the way.
 
 ```{ojs}
 //| echo: false
