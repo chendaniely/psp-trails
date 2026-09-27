@@ -83,9 +83,9 @@ ranger station on Cleveland Trail at W 16th Ave), where the group starts:
   next one kept only if it shares at most 75% of its trail segments with
   every route already kept (Jaccard similarity; `routing.pick_distinct`).
 - A **coverage pass** (`routing.cover_gaps`) then adds loops aimed at any
-  trail no 7–10 km route runs yet: 142 routes of 7–10 km cover 49.8 of the
-  park's 50.0 km of trail (the rest is 4 unnamed bits, listed on the About
-  page). 263 routes in all. The knobs are at the top of
+  trail no 7–10 km route runs yet: 141 routes of 7–10 km cover 49.7 of the
+  park's 49.9 km of trail (the rest is 3 short bits, listed on the About
+  page). 259 routes in all. The knobs are at the top of
   `07_generate_routes.py`.
 
 Each route also gets:
@@ -123,7 +123,7 @@ toilets and water). It's the route inspection ("Chinese postman") problem:
 join the trail network into one piece, pick the cheapest stretches to run
 twice so every junction is even (minimum-weight matching), then walk it as
 one Euler circuit (`routing.postman_route`). Dead-end offshoots up to 400 m
-are optional (`routing.offshoots`). Today: 67.8 km, ↑710 m, 12.4 km run
+are optional (`routing.offshoots`). Today: 62.5 km, ↑680 m, 9.8 km run
 twice. The idea comes from an existing Pacific Spirit Park ultra route,
 credited on the Ultra page (link to come).
 

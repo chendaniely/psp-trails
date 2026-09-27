@@ -120,7 +120,9 @@ costs (those stretches are run twice), then `nx.eulerian_circuit` from the
 Park Centre. `routing.offshoots` peels dead ends to find short out-and-back
 branches (≤400 m), marked optional; `directions(..., stop_at_turnaround=False,
 optional=...)` keeps going past dead ends and flags them. Aid passes = within
-250 m of the Park Centre. ~68 km, 3 s to compute.
+250 m of the Park Centre. ~62 km, 3 s to compute. A stray bit of "park trail"
+far from the rest can cost the ultra kilometres of detour: check the route and
+remove such stubs in `data/manual/` (as with the SW/NW Marine Dr stub).
 
 **Website** (`website/`, Quarto): `index.qmd` iframes `trail_map.html`;
 `routes.qmd` is Observable JS reading `routes.geojson`:
